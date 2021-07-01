@@ -35,10 +35,7 @@ load('complete_100_imputations.RData')
 #R source for big function
 source('BinaryModels_cv_lglk_kq_2020_10_23.R')
 
-####Options for the function are:
-#K.forward,response,names,splines,include.interaction, train.data,test.data,eval.method='orc'
-
-cont.vars <- c("PatientAge", "CT")
+cont.vars <- c("PatientAge", "CT", "Age_x_Bleeding", "CT_x_Bleeding")
 
 cat.vars <- c("PatientSex", 
               "Malaria",
@@ -56,12 +53,12 @@ cat.vars <- c("PatientSex",
               "Fever",
               "Hiccups",
               "Nausea",
-              "GI_Symptoms",
-              "Conjunctivitis")
+              "GI_Symptoms", 
+              "CT_cat")
 
 all.vars <- c(cat.vars, cont.vars)
 
-########################## TRY A LOOP ##################################
+########################## ITERATE OVER IMPUTED DATA ##################################
 
 imp_list_df2 <- map(1:length(imp_list_df), 
                     function(x) dplyr::select(imp_list_df[[x]], c('Death', all.vars)))
@@ -76,7 +73,7 @@ listdf <- map(1:length(imp_list_df2), function(x) foldfunc(imp_list_df2, x))
 
 K = 10
 names  = all.vars
-splines = F
+splines = T
 include.interaction = F
 
 bigfunc <- function(train.data) {

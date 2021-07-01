@@ -1,6 +1,13 @@
-rm(list=ls())
-library(data.table)
 
+rm(list=ls())
+
+library(data.table)
+library(mice)
+
+###############################################################
+################ Train models and pool results ################
+###############################################################
+setwd('~/Desktop/Ebola')
 vars <- data.table::fread("fwd_selection_results.csv", drop = "V1")  
 load('mids_100.RData')
 
@@ -8,17 +15,12 @@ fifty <- (subset(vars, Freq >= 50))$Var1
 forty <- (subset(vars, Freq >= 40))$Var1
 thirty <- (subset(vars, Freq >=30))$Var1 
 
-fit50 <- with(imp, glm(reformulate(fifty, response = 'Death'), family = "binomial"))
-est50 <- pool(fit50)
+fit1 <- with(imp, glm(Death ~ AstheniaWeakness + Breathlessness + CT + PatientAge, family = "binomial"))
+est1 <- pool(fit1)
 
-fit40 <- with(imp, glm(reformulate(forty, response = 'Death'), family = "binomial"))
-est40 <- pool(fit40)
+fit2 <- with(imp, glm(Death ~ AstheniaWeakness + Breathlessness + CT + Malaria + PatientAge, family = "binomial"))
+est2 <- pool(fit2)
 
-fit30 <- with(imp, glm(reformulate(thirty, response = 'Death'), family = "binomial"))
-est30 <- pool(fit30)
-
-save(est50, file = 'pooledmodel50.RData')
-
-est50$pooled
-class(est50)
-summary(est50, conf.int = T)
+fit3 <- with(imp, glm(Death ~ AnyBleeding + AstheniaWeakness + Breathlessness + CT + 
+                        Diarrhoea + Headache + Malaria + PatientAge, family = "binomial"))
+est3 <- pool(fit3)
