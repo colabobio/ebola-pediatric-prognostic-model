@@ -1,2 +1,5 @@
 .DS_Store
 .Rapp.history
+
+*.csv
+regsel-protocol-jupyter/model-*
