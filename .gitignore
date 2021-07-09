@@ -1,5 +1,6 @@
 .DS_Store
 .Rapp.history
+.ipynb_checkpoints
 
 *.csv
 regsel-protocol-jupyter/model-*
