@@ -361,7 +361,7 @@ lab_data %>%
     SwallowingProblems = S2.DifficultySwallowing,
     Anorexia = S2.AppetiteLoss,
     BoneMusclePain = S2.JoinMusclePain,
-    LAB = Lab.AmLyteAST.D2
+    LAB = Lab.AmLyteAST.D1.D2
     ) -> lab_data
 
 lab_data %>%
@@ -369,10 +369,99 @@ lab_data %>%
 
 lab_data %>% drop_na() -> lab_data
 
+#lab_data %>% 
+#  mutate(LAB = as.character(LAB)) %>% 
+#  mutate(LAB = replace(LAB, LAB == '>2000', floor(runif(1, min=2000, max=2500)))) -> lab_data
+
+
 lab_data
 
 ```
 
+
+```{r}
+pred <- predict(model, lab_data)
+probs <- exp(pred) / (1 + exp(pred))
+#print(probs)
+obs <- lab_data$Death
+
+data = data.frame(Death = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+
+m4 <- glm(data$Death ~  1 + data$logodds + lab_data$LAB, family = binomial)
+m4
+
+data$m4_pred <- predict(m4, type = "response")
+
+x <- cal_plot2(m4, "original", "m4_pred", model_label ='' )
+plot(x)
+```
+
+```{r}
+rocobj <- plot.roc(data$Death, data$m4_pred,
+                   main = "Confidence intervals", 
+                   percent=TRUE,
+                   ci = TRUE,                  # compute AUC (of AUC by default)
+                   print.auc = TRUE)           # print the AUC (will contain the CI)
+                   ciobj <- ci.se(rocobj,                         # CI of sensitivity
+                   specificities = seq(0, 100, 5)) # over a select set of specificities
+plot(ciobj, type = "shape", col = "#1c61b6AA")     # plot as a blue shape
+plot(ci(rocobj, of = "thresholds", thresholds = "best")) # add one threshold
+```
+
+```{r}
+data$m4_pred 
+
+pp <- data$m4_pred 
+ll <- obs
+
+pred <- prediction(pp, ll)
+
+perf <- performance(pred, "tpr", "fpr")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "With ROCR you can produce standard plots\nlike ROC curves ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "prec", "rec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... Precision/Recall graphs ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "sens", "spec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main="... Sensitivity/Specificity plots ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "lift", "rpp")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... and Lift charts.")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+```
 
 EVALUATION ON TRAINING SET
 
