@@ -1,0 +1,45 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Model updating
+https://bmcmedresmethodol.biomedcentral.com/articles/10.1186/s12874-016-0231-2
+
+```{r}
+test_data_file = 'drc-data.csv' 
+test_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+
+test_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain
+    ) -> test_data
+
+test_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+
+test_data %>% drop_na() -> test_data
+
+test_data
+```
+
+```{r}
+load("model.RData")
+
+mdl_anv <- anova(model)
+mdl_upd <- update(model, x=TRUE, y=TRUE)
+mdl_val <- validate(mdl_upd, B=nboot)
+mdl_cal <- calibrate(mdl_upd, B=nboot)
+```
+
+```{r}
+
+```

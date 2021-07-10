@@ -1,0 +1,379 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(rms)
+library(ROCR)
+```
+
+```{r}
+test_data_file = 'drc-data.csv' 
+test_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+  
+test_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain
+    ) -> test_data
+
+test_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+
+test_data %>% drop_na() -> test_data
+
+test_data
+```
+
+```{r}
+load("model.RData")
+
+mdl_anv <- anova(model)
+mdl_upd <- update(model, x=TRUE, y=TRUE)
+mdl_val <- validate(mdl_upd, B=nboot)
+mdl_cal <- calibrate(mdl_upd, B=nboot)
+
+
+#plot(summary(model), log=TRUE)
+
+#summary(model)
+# Partial effects plot (from code in pp 279 in Harrel's Regression Modeling Strategies, figure 11.2)
+# Not working inside a function though, gives the error:
+# variable xxx does not have limits defined by datadist
+
+```
+
+```{r}
+dd <- datadist(train_data)
+options(datadist='dd')
+ggplot(Predict(model), sepdiscrete='vertical', vnames='names', rdata=train_data, histSpike.opts=list(frac=function(model) .1*model/max(model) ))
+       
+```
+
+```{r}
+plot(nomogram(model))
+```
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+#print(probs)
+obs <- test_data$Death
+#print(pred)
+```
+
+```{r}
+pp <- probs
+ll <- obs
+
+pred <- prediction(pp, ll)
+perf <- performance(pred, "tpr", "fpr")
+
+plot(perf, avg= "threshold", colorize=TRUE, lwd= 3,
+     coloraxis.at=seq(0,1,by=0.2),)
+plot(perf, col="gray78", add=TRUE)
+plot(perf, avg= "threshold", colorize=TRUE, colorkey=FALSE,lwd= 3,,add=TRUE)
+mtext(paste0("(a)"), side = 3, adj = 0.01,line = 1)
+
+perf <- performance(pred, "acc")
+plot(perf, avg= "vertical", spread.estimate="boxplot", lwd=3,col='blue',
+     show.spread.at= seq(0.1, 0.9, by=0.1),)
+mtext(paste0("(b)"), side = 3, adj = 0.01,line = 1)
+
+
+plot(performance(pred, "cal", window.size= 10),
+     avg="vertical",)
+mtext(paste0("(c)"), side = 3, adj = 0.01,line = 1)
+```
+
+
+```{r}
+perf <- performance(pred, "tpr", "fpr")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "With ROCR you can produce standard plots\nlike ROC curves ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "prec", "rec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... Precision/Recall graphs ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "sens", "spec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main="... Sensitivity/Specificity plots ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "lift", "rpp")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... and Lift charts.")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+```
+
+```{r}
+cost.perf = performance(pred, "cost", cost.fp = 1, cost.fn = 5)
+pred@cutoffs[[1]][which.min(cost.perf@y.values[[1]])]
+```
+
+
+
+```{r}
+library(pROC)
+# https://rpubs.com/Wangzf/pROC
+
+plot.roc(obs, probs,          # data
+         percent = TRUE,                    # show all values in percent
+         partial.auc=c(100, 90), 
+         partial.auc.correct=TRUE,          # define a partial AUC (pAUC)
+         print.auc=TRUE,                    
+         #display pAUC value on the plot with following options:
+         print.auc.pattern = "Corrected pAUC (100-90%% SP):\n%.1f%%",
+         print.auc.col = "#1c61b6",
+         auc.polygon = TRUE, 
+         auc.polygon.col = "#1c61b6",       # show pAUC as a polygon
+         max.auc.polygon = TRUE, 
+         max.auc.polygon.col = "#1c61b622", # also show the 100% polygon
+         main = "Partial AUC (pAUC)")
+
+plot.roc(obs, probs,
+         percent = TRUE, 
+         add = TRUE, 
+         type = "n",                        # add to plot, but don't re-add the ROC itself (useless)
+         partial.auc = c(100, 90), 
+         partial.auc.correct = TRUE,
+         partial.auc.focus = "se",          # focus pAUC on the sensitivity
+         print.auc = TRUE, 
+         print.auc.pattern = "Corrected pAUC (100-90%% SE):\n%.1f%%", 
+         print.auc.col = "#008600",
+         print.auc.y = 40,                  # do not print auc over the previous one
+         auc.polygon = TRUE, 
+         auc.polygon.col = "#008600",
+         max.auc.polygon = TRUE, 
+         max.auc.polygon.col = "#00860022")
+
+rocobj <- plot.roc(obs, probs,
+                   main = "Confidence intervals", 
+                   percent=TRUE,
+                   ci = TRUE,                  # compute AUC (of AUC by default)
+                   print.auc = TRUE)           # print the AUC (will contain the CI)
+                   ciobj <- ci.se(rocobj,                         # CI of sensitivity
+                   specificities = seq(0, 100, 5)) # over a select set of specificities
+plot(ciobj, type = "shape", col = "#1c61b6AA")     # plot as a blue shape
+plot(ci(rocobj, of = "thresholds", thresholds = "best")) # add one threshold
+```
+
+```{r}
+# https://www.rdocumentation.org/packages/rms/versions/6.2-0/topics/val.prob
+val.prob(probs, obs)
+
+#x <- cal_plot(m1, "HOMR model", "m1_pred")
+```
+```{r}
+# https://darrendahly.github.io/post/homr/
+  cal_plot <- function(model, model_name, pred_var, ...){
+
+    require(tidyverse)
+    require(viridis)
+    require(gridExtra)
+
+# The calibration plot        
+    g1 <- mutate(test_data, bin = ntile(get(pred_var), 10)) %>% 
+          # Bin prediction into 10ths
+      group_by(bin) %>%
+      mutate(n = n(), # Get ests and CIs
+             bin_pred = mean(get(pred_var)), 
+             bin_prob = mean(obs), 
+             se = sqrt((bin_prob * (1 - bin_prob)) / n), 
+             ul = bin_prob + 1.96 * se, 
+             ll = bin_prob - 1.96 * se) %>%
+      ungroup() %>%
+    ggplot(aes(x = bin_pred, y = bin_prob, ymin = ll, ymax = ul)) +
+      geom_pointrange(size = 0.5, color = "black") +
+      scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+      scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+      geom_abline() + # 45 degree line indicating perfect calibration
+      geom_smooth(method = "lm", se = FALSE, linetype = "dashed", 
+                  color = "black", formula = y~-1 + x) + 
+                  # straight line fit through estimates
+      geom_smooth(aes(x = get(pred_var), y = obs), 
+                  color = "red", se = FALSE, method = "loess") + 
+                  # loess fit through estimates
+      xlab("") +
+      ylab("Observed Probability") +
+      theme_minimal() +
+      ggtitle(model_name)
+
+# The distribution plot        
+    g2 <- ggplot(test_data, aes(x = get(pred_var))) +
+      geom_histogram(fill = "black", bins = 200) +
+      scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+      xlab("Predicted Probability") +
+      ylab("") +
+      theme_minimal() +
+      scale_y_continuous(breaks = c(0, 40)) +
+      theme(panel.grid.minor = element_blank())
+    
+# Combine them    
+    g <- arrangeGrob(g1, g2, respect = TRUE, heights = c(1, 0.25), ncol = 1)
+    grid.newpage()
+    grid.draw(g)
+    return(g[[3]])
+
+  }
+
+```
+
+```{r}
+#mdl_pred
+
+x <- cal_plot(model, "EVD model", "probs")
+```
+
+EVALUATION ON TRAINING SET
+
+```{r}
+train_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> train_data_clean
+
+train_data_clean %>% drop_na() -> train_data_clean
+
+pred <- predict(model, train_data_clean)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- train_data_clean$Death
+
+pp <- probs
+ll <- obs
+
+pred <- prediction(pp, ll)
+perf <- performance(pred, "tpr", "fpr")
+
+
+#perf <- performance(pred, "tpr", "fpr")
+```
+
+```{r}
+perf <- performance(pred, "tpr", "fpr")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "With ROCR you can produce standard plots\nlike ROC curves ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "prec", "rec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... Precision/Recall graphs ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "sens", "spec")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main="... Sensitivity/Specificity plots ...")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+
+perf <- performance(pred, "lift", "rpp")
+plot(perf,
+     avg= "threshold",
+     colorize=TRUE,
+     lwd= 3,
+     main= "... and Lift charts.")
+plot(perf,
+     lty=3,
+     col="grey78",
+     add=TRUE)
+```
+
+```{r}
+cost.perf = performance(pred, "cost", cost.fp = 1, cost.fn = 2)
+pred@cutoffs[[1]][which.min(cost.perf@y.values[[1]])]
+```
+
+```{r}
+plot.roc(obs, probs,          # data
+         percent = TRUE,                    # show all values in percent
+         partial.auc=c(100, 90), 
+         partial.auc.correct=TRUE,          # define a partial AUC (pAUC)
+         print.auc=TRUE,                    
+         #display pAUC value on the plot with following options:
+         print.auc.pattern = "Corrected pAUC (100-90%% SP):\n%.1f%%",
+         print.auc.col = "#1c61b6",
+         auc.polygon = TRUE, 
+         auc.polygon.col = "#1c61b6",       # show pAUC as a polygon
+         max.auc.polygon = TRUE, 
+         max.auc.polygon.col = "#1c61b622", # also show the 100% polygon
+         main = "Partial AUC (pAUC)")
+
+plot.roc(obs, probs,
+         percent = TRUE, 
+         add = TRUE, 
+         type = "n",                        # add to plot, but don't re-add the ROC itself (useless)
+         partial.auc = c(100, 90), 
+         partial.auc.correct = TRUE,
+         partial.auc.focus = "se",          # focus pAUC on the sensitivity
+         print.auc = TRUE, 
+         print.auc.pattern = "Corrected pAUC (100-90%% SE):\n%.1f%%", 
+         print.auc.col = "#008600",
+         print.auc.y = 40,                  # do not print auc over the previous one
+         auc.polygon = TRUE, 
+         auc.polygon.col = "#008600",
+         max.auc.polygon = TRUE, 
+         max.auc.polygon.col = "#00860022")
+
+rocobj <- plot.roc(obs, probs,
+                   main = "Confidence intervals", 
+                   percent=TRUE,
+                   ci = TRUE,                  # compute AUC (of AUC by default)
+                   print.auc = TRUE)           # print the AUC (will contain the CI)
+                   ciobj <- ci.se(rocobj,                         # CI of sensitivity
+                   specificities = seq(0, 100, 5)) # over a select set of specificities
+plot(ciobj, type = "shape", col = "#1c61b6AA")     # plot as a blue shape
+plot(ci(rocobj, of = "thresholds", thresholds = "best")) # add one threshold
+```
