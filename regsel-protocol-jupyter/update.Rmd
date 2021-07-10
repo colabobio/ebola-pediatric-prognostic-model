@@ -21,25 +21,23 @@ test_data %>%
     SwallowingProblems = S2.DifficultySwallowing,
     Anorexia = S2.AppetiteLoss,
     BoneMusclePain = S2.JoinMusclePain
-    ) -> test_data
+    ) -> model_data
 
-test_data %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+model_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> model_data
 
-test_data %>% drop_na() -> test_data
+model_data %>% drop_na() -> model_data
 
-test_data
+
 ```
 
 ```{r}
-load("model.RData")
+load("model-age-ct-symp/model.RData")
 
-mdl_anv <- anova(model)
-mdl_upd <- update(model, x=TRUE, y=TRUE)
-mdl_val <- validate(mdl_upd, B=nboot)
-mdl_cal <- calibrate(mdl_upd, B=nboot)
+pred0 <- predict(model, model_data)
+pred0
 ```
 
 ```{r}
-
+test_data$Lab.AmLyteGLU.D1
 ```

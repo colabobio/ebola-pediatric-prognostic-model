@@ -9,6 +9,7 @@ library(dplyr)
 library(tidyr)
 library(rms)
 library(ROCR)
+
 ```
 
 ```{r}
@@ -37,12 +38,12 @@ test_data
 ```
 
 ```{r}
-load("model.RData")
+load("model-age-ct-symp/model.RData")
 
-mdl_anv <- anova(model)
-mdl_upd <- update(model, x=TRUE, y=TRUE)
-mdl_val <- validate(mdl_upd, B=nboot)
-mdl_cal <- calibrate(mdl_upd, B=nboot)
+#mdl_anv <- anova(model)
+#mdl_upd <- update(model, x=TRUE, y=TRUE)
+#mdl_val <- validate(mdl_upd, B=nboot)
+#mdl_cal <- calibrate(mdl_upd, B=nboot)
 
 
 #plot(summary(model), log=TRUE)
@@ -80,8 +81,7 @@ ll <- obs
 pred <- prediction(pp, ll)
 perf <- performance(pred, "tpr", "fpr")
 
-plot(perf, avg= "threshold", colorize=TRUE, lwd= 3,
-     coloraxis.at=seq(0,1,by=0.2),)
+plot(perf, avg= "threshold", colorize=TRUE, lwd= 3, coloraxis.at=seq(0,1,by=0.2),)
 plot(perf, col="gray78", add=TRUE)
 plot(perf, avg= "threshold", colorize=TRUE, colorkey=FALSE,lwd= 3,,add=TRUE)
 mtext(paste0("(a)"), side = 3, adj = 0.01,line = 1)
@@ -202,66 +202,177 @@ val.prob(probs, obs)
 
 #x <- cal_plot(m1, "HOMR model", "m1_pred")
 ```
+
+
+
 ```{r}
 # https://darrendahly.github.io/post/homr/
-  cal_plot <- function(model, model_name, pred_var, ...){
+cal_plot2 <- function(model, model_name, pred_var,model_label, ...){
+  
+  require(tidyverse)
+  require(viridis)
+  require(gridExtra)
 
-    require(tidyverse)
-    require(viridis)
-    require(gridExtra)
-
-# The calibration plot        
-    g1 <- mutate(test_data, bin = ntile(get(pred_var), 10)) %>% 
-          # Bin prediction into 10ths
-      group_by(bin) %>%
-      mutate(n = n(), # Get ests and CIs
-             bin_pred = mean(get(pred_var)), 
-             bin_prob = mean(obs), 
-             se = sqrt((bin_prob * (1 - bin_prob)) / n), 
-             ul = bin_prob + 1.96 * se, 
-             ll = bin_prob - 1.96 * se) %>%
-      ungroup() %>%
+  # The calibration plot        
+  g1 <- mutate(data, bin = ntile(get(pred_var), 10)) %>% 
+    # Bin prediction into 10ths
+    group_by(bin) %>%
+    mutate(n = n(), # Get ests and CIs
+           bin_pred = mean(get(pred_var)), 
+           bin_prob = mean(as.numeric(Death) ), 
+           se = sqrt((bin_prob * (1 
+                                  - bin_prob)) / n), 
+           ul = bin_prob + 1.96 * se, 
+           ll = bin_prob - 1.96 * se,
+           ul = ifelse(ul>0,ul,0),
+           ll = ifelse(ll >0, ll,0),
+           ul = ifelse(ul<1,ul,1),
+           ll = ifelse(ll <1, ll,1)) %>%
+    ungroup() %>%
     ggplot(aes(x = bin_pred, y = bin_prob, ymin = ll, ymax = ul)) +
-      geom_pointrange(size = 0.5, color = "black") +
-      scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
-      scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
-      geom_abline() + # 45 degree line indicating perfect calibration
-      geom_smooth(method = "lm", se = FALSE, linetype = "dashed", 
-                  color = "black", formula = y~-1 + x) + 
-                  # straight line fit through estimates
-      geom_smooth(aes(x = get(pred_var), y = obs), 
-                  color = "red", se = FALSE, method = "loess") + 
-                  # loess fit through estimates
-      xlab("") +
-      ylab("Observed Probability") +
-      theme_minimal() +
-      ggtitle(model_name)
-
-# The distribution plot        
-    g2 <- ggplot(test_data, aes(x = get(pred_var))) +
-      geom_histogram(fill = "black", bins = 200) +
-      scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
-      xlab("Predicted Probability") +
-      ylab("") +
-      theme_minimal() +
-      scale_y_continuous(breaks = c(0, 40)) +
-      theme(panel.grid.minor = element_blank())
-    
-# Combine them    
-    g <- arrangeGrob(g1, g2, respect = TRUE, heights = c(1, 0.25), ncol = 1)
-    grid.newpage()
-    grid.draw(g)
-    return(g[[3]])
-
+    geom_pointrange(size = 0.2, color = "black",aes(color='black'),show.legend =TRUE) +
+    scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+    scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+    geom_abline() + # 45 degree line indicating perfect calibration
+    geom_smooth(method = "lm", se = FALSE, linetype = "dashed", 
+                color = "black", formula = y~-1 + x,show.legend =TRUE) + 
+    # straight line fit through estimates
+    geom_smooth(aes(x = get(pred_var), y = as.numeric(Death) ),
+                color = "red", se = FALSE, method = "loess") +
+    # loess fit through estimates
+    xlab("") +
+    ylab("Observed Probability") +
+    theme_minimal() +
+    ggtitle(model_label) 
+   
+  
+  # The distribution plot   
+  xlabel='Calibrated Probability'
+  if(model_name =='original'){
+    xlabel='Predicted Probability'
   }
+  g2 <- ggplot(data, aes(x = get(pred_var))) +
+    geom_histogram(fill = "black", bins = 200) +
+    scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
+    xlab(xlabel) +
+    ylab("") +
+    theme_minimal() +
+    scale_y_continuous(breaks = c(0, 80)) +
+    theme(panel.grid.minor = element_blank())
+  
+  # Combine them    
+  g <- arrangeGrob(g1, g2, respect = TRUE, heights = c(1, 0.4), ncol = 1)
+  #grid.newpage()
+  #grid.draw(g)
+  return(g)
+  #return(g[[3]])  
+}
 
 ```
 
 ```{r}
-#mdl_pred
+library(ResourceSelection)
 
-x <- cal_plot(model, "EVD model", "probs")
+data = data.frame(Death = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+m1 <- glm(data$Death ~  -1 + offset(data$logodds), family = binomial)
+data$m1_pred <- predict(m1, type = "response")
+
+hl <- hoslem.test(data$Death, data$prob, g=10)
+print(hl)
+
+#p-value of `r hl$p.value` indicates predicted probabilities did not differ significantly from observed probabilities. 
+
 ```
+```{r}
+x <- cal_plot2(m1, "original", "m1_pred", model_label ='' )
+plot(x)
+```
+
+Recalibration  following
+https://darrendahly.github.io/post/homr/
+
+```{r}
+
+# Recalibration on the large
+
+m2 <- glm(data$Death ~  1 + offset(data$logodds), family = binomial)
+m2
+
+data$m2_pred <- predict(m2, type = "response")
+
+x <- cal_plot2(m2, "original", "m2_pred", model_label ='' )
+plot(x)
+
+```
+```{r}
+rocobj <- plot.roc(data$Death, data$m2_pred,
+                   main = "Confidence intervals", 
+                   percent=TRUE,
+                   ci = TRUE,                  # compute AUC (of AUC by default)
+                   print.auc = TRUE)           # print the AUC (will contain the CI)
+                   ciobj <- ci.se(rocobj,                         # CI of sensitivity
+                   specificities = seq(0, 100, 5)) # over a select set of specificities
+plot(ciobj, type = "shape", col = "#1c61b6AA")     # plot as a blue shape
+plot(ci(rocobj, of = "thresholds", thresholds = "best")) # add one threshold
+```
+
+```{r}
+
+# Logistic recalibration
+
+m3 <- glm(data$Death ~  1 + data$logodds, family = binomial)
+m3
+
+data$m3_pred <- predict(m3, type = "response")
+
+x <- cal_plot2(m3, "original", "m3_pred", model_label ='' )
+plot(x)
+
+```
+
+```{r}
+rocobj <- plot.roc(data$Death, data$m3_pred,
+                   main = "Confidence intervals", 
+                   percent=TRUE,
+                   ci = TRUE,                  # compute AUC (of AUC by default)
+                   print.auc = TRUE)           # print the AUC (will contain the CI)
+                   ciobj <- ci.se(rocobj,                         # CI of sensitivity
+                   specificities = seq(0, 100, 5)) # over a select set of specificities
+plot(ciobj, type = "shape", col = "#1c61b6AA")     # plot as a blue shape
+plot(ci(rocobj, of = "thresholds", thresholds = "best")) # add one threshold
+```
+
+MODEL UPDATING -- Very similar to Logistic recalibration, with one more parameter
+
+```{r}
+
+lab_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+
+
+lab_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain,
+    LAB = Lab.AmLyteAST.D2
+    ) -> lab_data
+
+lab_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain, LAB) -> lab_data
+
+lab_data %>% drop_na() -> lab_data
+
+lab_data
+
+```
+
 
 EVALUATION ON TRAINING SET
 
@@ -282,7 +393,21 @@ pred <- prediction(pp, ll)
 perf <- performance(pred, "tpr", "fpr")
 
 
-#perf <- performance(pred, "tpr", "fpr")
+val.prob(probs, obs)
+```
+```{r}
+data = data.frame(Death = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+m1 <- glm(data$Death ~  -1 + offset(data$logodds), family = binomial)
+data$m1_pred <- predict(m1, type = "response")
+
+hl <- hoslem.test(data$Death, data$prob, g=10)
+print(hl)
+```
+
+```{r}
+x <- cal_plot2(m1, "original", "m1_pred", model_label ='' )
+plot(x)
 ```
 
 ```{r}
