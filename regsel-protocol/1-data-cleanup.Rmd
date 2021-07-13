@@ -1,0 +1,49 @@
+---
+title: "Data cleanup"
+output:
+  html_document:
+    df_print: paged
+---
+
+This notebook cleans up the DRC data by removing patients with length of stay (LOS) less than 24 hours, 
+inverting final status, and aggregating lab results for days 1 and 2.
+
+```{r setup, include=FALSE}
+library(dplyr)
+```
+
+```{r}
+df <- read.table("drc-data-orig.csv", sep=",", header=TRUE, na.strings="")
+```
+
+```{r}
+# Removing cases with LOS less than 24 hours
+df <- subset(df, LOS_bin_new != "<24h")
+
+# Inverting outcome value (1=alive, 0=dead, but opposite is needed in prog model)
+df$S7.FinalStatus <- 1 - df$S7.FinalStatus
+
+# Creating the JoinMuscle pain variable
+df$S2.JoinMusclePain <- ifelse(
+    ( 
+        (df$S2.MusclePain == 1) |
+        (df$S2.JointPain == 1)
+    ),
+    1,  # if condition is met, put 1
+    0   # else put 0
+)
+```
+
+```{r}
+df[is.na(df)] <- "\\N"
+write.table(df, file="drc-data-tmp.csv", sep = ",", row.names = FALSE)
+```
+
+Another step is performed manually after saving the file, which consists in aggregating lab results 
+form days 1 and 2 (using the highest value if both are non-null). Also replacing out-of-range readings
+by random values above or below the limit. Maybe this can be done in the future using dplyr:
+
+https://www.marsja.se/r-add-column-to-dataframe-based-on-other-columns-conditions-dplyr/
+https://stackoverflow.com/questions/54774280/plyrddply-equivalent-in-dplyr
+
+But for the time being it was easier to just to manually since the number of rows is not too high.

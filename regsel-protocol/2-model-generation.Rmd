@@ -1,0 +1,333 @@
+---
+title: "Model generation"
+output:
+  html_document:
+    df_print: paged
+---
+
+This notebook generates the prognostic model using the EDP dataset as training.
+
+```{r setup, include=FALSE}
+library(rms)
+library(Hmisc)
+library(glmnet)
+library(mvnormtest)
+library(naniar)
+```
+
+```{r message=FALSE, cache=F}
+source('./var-selection.R')
+```
+
+1. DATA SETUP
+
+```{r}
+src_data_file <- "edp-data.csv"
+
+out_var = "Death"
+
+num_imp <-100   # Number of multiple imputations
+num_boot <- 200  # Number of bootstrap samples
+
+random_seed <- 151  # Setting random seed for reproducibility
+```
+
+```{r}
+# Read the source data
+src_data <- read.table(src_data_file, sep=",", header=TRUE, na.strings="\\N")
+
+# Splitting records by site to apply MCAR test on each separately
+conarky_data <- src_data[src_data$SiteID == "CONAKRY", ]
+nzerekore_data <- src_data[src_data$SiteID == "CTE-NZEREKORE", ]
+elwa_data <- src_data[src_data$SiteID == "ELWA3", ]
+msfbo_data <- src_data[src_data$SiteID == "MSF_Bo", ]
+bong_data <- src_data[src_data$SiteID == "1-Bong", ]
+lunsar_data <- src_data[src_data$SiteID == "2-Lunsar", ]
+margibi_data <- src_data[src_data$SiteID == "3-Margibi", ]
+kambia_data <- src_data[src_data$SiteID == "4-Kambia", ]
+makeni_data <- src_data[src_data$SiteID == "5-Makeni", ]
+
+summary_table <- data.frame(do.call(cbind, lapply(src_data, summary)))
+print(summary_table)
+```
+
+```{r}
+# Applying the heuristic for the maximum number of degrees of freedom (DOF) in the model
+# as p less than m/10 or m/20, where m is the “limiting sample size”, min(n1, n2) in the
+# case of a binary output with n1 and n2 for the two possible occurrences.
+# See section "4.4 Sample Size, Overfitting, and Limits on Number of Predictors"
+# in Harrell's Regression Modelling Strategies for more information.
+mdead <- sum(src_data[out_var] == 1, na.rm = TRUE)
+msurv <- sum(src_data[out_var] == 0, na.rm = TRUE)
+print(paste0("Recommended maximum DOF:", ceiling(min(mdead, msurv) / 15)))
+
+all_vars <- colnames(src_data)
+all_vars <- all_vars[-(1:2)]
+print("")
+print("All variables in the data:")
+print(all_vars)
+print("")
+
+# Removing predictor variables with more than 50% of missing values
+pred_table <- summary_table[-(1:3)]
+pred_vars <- colnames(pred_table[sapply(pred_table, function(x) strtoi(x[7]) < 0.5 * nrow(src_data))])
+
+print("")
+print("All predictor variables:")
+print(pred_vars)
+print("")
+print(paste0("Number of variables:", length(pred_vars)))
+```
+
+2. TESTING MISSING COMPLETELY AT RANDOM
+
+We now perform some calculations on all the a-priori model variables, to determine a number of important properties: 
+normal distribution of the data (https://en.wikipedia.org/wiki/Shapiro%E2%80%93Wilk_test), and Missing Completely at Random (MCAR) condition.
+We use the package mvnormtest to test for multivariate normality, using the Shapiro-Wilk test:
+
+```{r}
+set.seed(random_seed)
+
+test_vars = append(pred_vars, out_var)
+
+# The test can only be performend on complete data
+test_data <- src_data[unlist(test_vars)]
+df <- test_data[complete.cases(test_data), ]
+mat <- t(as.matrix(sapply(df, as.numeric)))
+print(mshapiro.test(mat))
+```
+
+The null-hypothesis (normal data) is rejected by the test. We apply Little's test for MCAR using the mcar_test 
+function in the naniar package (http://naniar.njtierney.com/reference/mcar_test.html)
+
+```{r}
+test_data <- src_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+```
+
+Since the test is significant, the MCAR hypthesis is rejected on the entire dataset.Let's apply the test separately on the data from each EDP site, 
+to see if the non-randomness in the missing data can be attributed  to the differences in data availability at each ETU.
+
+```{r}
+# In all these sites, the MCAR test works
+
+print("CONAKRY")
+test_data <- conarky_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+
+print("ELWA3")
+test_data <- elwa_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+
+print("MSF_Bo")
+test_data <- msfbo_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+
+print("2-Lunsar")
+test_data <- lunsar_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+
+print("5-Makeni")
+test_data <- makeni_data[unlist(test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+```
+
+The MCAR hypthesis cannot be rejected for the ELWA3 data. Inspecting separately:
+
+```{r}
+test_data <- elwa_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+From visual inspection of the missing patterns, it could be that the MCAR hypothesis is rejected due to variables with more than 20% missingness (AnyBleeding and Nausea)
+
+```{r}
+# Removing AnyBleeding and Nausea
+elwa_test_vars <- test_vars[-which(test_vars == "AnyBleeding")]
+elwa_test_vars <- elwa_test_vars[-which(elwa_test_vars == "Nausea")]
+```
+
+
+```{r}
+test_data <- elwa_data[unlist(elwa_test_vars)]
+res <- mcar_test(test_data)
+print(res$statistic)
+print(res$p.value)
+print(res$missing.patterns)
+print("")
+```
+
+Removal of the high missingness variables in ELWA data results in accepting MCAR. Now, examining CTE-NZEREKORE, 1-Bongo, 3-Margibi, and 4-Kambia visually because those cause the MCAR test to crash
+
+```{r}
+print("CTE-NZEREKORE")
+test_data <- nzerekore_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+```{r}
+print("1-Bongo")
+test_data <- bong_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+```{r}
+print("3-Margibi")
+test_data <- margibi_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+```{r}
+print("4-Kambia")
+test_data <- kambia_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+In all these cases the results of the test failing to run is because of entire columns missing. Removal of those would result in MCAR.
+
+3. MODEL BUILDING
+
+3.a Saturated model
+
+We start by fitting a logistic regression model on all the variables.
+
+```{r}
+
+sat_vars <- pred_vars
+
+sat_imp_formula <- "~Death+PatientAge+PatientSex+CT+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
+sat_lgr_formula <- "Death~rcs(PatientAge,3)+PatientSex+rcs(CT,3)+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
+
+print(sat_imp_formula)
+print(sat_lgr_formula)
+
+sat_folder <- "model-saturated"
+dir.create(sat_folder)
+```
+
+```{r}
+set.seed(random_seed)
+
+# Impute data and fit pooled model
+sat_impute <- aregImpute(as.formula(sat_imp_formula), data=src_data, n.impute=num_imp)
+sat_model <- fit.mult.impute(as.formula(sat_lgr_formula), lrm, sat_impute, data=src_data)
+
+# Calculate ANOVA and validation/calibration
+sat_anova <- anova(sat_model)
+sat_update <- update(sat_model, x=TRUE, y=TRUE)
+sat_val <- validate(sat_update, B=num_boot)
+sat_cal <- calibrate(sat_update, B=num_boot)
+
+# Calculate distribution summaries for potential predictor variables
+sat_datadist <- datadist(getImpute(impute = sat_impute, im = 1))
+
+saveDescription(f=sat_model, vars=sat_vars, dir=sat_folder)
+saveEvaluation(an=sat_anova, val=sat_val, cal=sat_cal, dir=sat_folder)
+
+options(datadist='sat_datadist')
+dir <- sat_folder
+df <- getImpute(impute=sat_impute, im=1)
+f <- sat_update
+
+pdf(paste0(dir, "/partial.pdf"), useDingbats=FALSE)
+print(ggplot(Predict(f), sepdiscrete='vertical', vnames='names', 
+             rdata=df, histSpike.opts=list(frac=function(f) .1*f/max(f))))
+dev.off() 
+
+pdf(paste0(dir, "/or.pdf"), useDingbats=FALSE) 
+plot(summary(f), log=TRUE)  
+dev.off()
+
+plot(summary(f), log=TRUE)
+```
+
+The saturated model has a AUC (C statistic) on the training data of 0.783, and an optimism in Dxy of 0.0709. Since C and Dxy are related by C = 0.5 + Dxy/2, the optimism corrected C is ~0.76, so the saturated model has a degree of overfitting to the data, although is not too bad. Some clinical symptoms have ORs lower than 1. This seems to indicate they increase the odds of survival, which does not make medical sense.
+
+3.b Variable selection with penalized regression
+
+Here we use Elastic Net Regularization for variable selection. We run the regularized logistic regression with the Glmnet package on each imputed dataset, and calculate how many times the coefficient for each variable over all the regressions is greater than zero.
+
+We are looking for variables that consistenly show non-negative coefficients since they represent clinical signs/symptoms at presentation that should be related with decreased changes of recovery. There are exceptions to this, for example cycletime has a negative coefficient since larger CT values indicate lower viral load and thus higher chances of recovery.
+
+```{r}
+selection <- selectVariables(random_seed, num_imp, sat_imp_formula, src_data, TRUE)
+```
+
+We set the threshold for keeping a variable at +50% in the above list, meaning that the corresponding regression coefficient had to be positive at least in half of the models to be selected. As mentioned CT has a negative coefficient, and patient age and fever temperature are pre-determined, so we will only look at sign/symptoms above that threshold:
+
+```{r}
+sel_df <- data.frame(unlist(selection$names), unlist(selection$counts))
+names(sel_df) <- c("Variable", "Freq")
+
+sel_df
+```
+
+3.c  Age + CT + selected symptoms model
+
+```{r}
+mdl_vars <- c('PatientAge', 'CT', 'AnyBleeding', 'Diarrhoea', 'Breathlessness', 'SwallowingProblems', 'Anorexia', 'BoneMusclePain')
+
+mdl_imp_formula <- "~Death+PatientAge+PatientSex+CT+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
+
+mdl_lgr_formula <- "Death~rcs(PatientAge,3)+rcs(CT,3)+AnyBleeding+Diarrhoea+Breathlessness+SwallowingProblems+Anorexia+BoneMusclePain"
+
+mdl_folder <- "model-age-ct-symp"
+dir.create(mdl_folder)
+```
+
+```{r}
+model <- generateModel(random_seed, num_imp, num_boot, mdl_imp_formula, mdl_lgr_formula, src_data, mdl_vars, mdl_folder)
+```
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+```{r}
+parteff_plot(model, src_data, mdl_folder, "parteff_plot.pdf")
+```
+
+```{r}
+src_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> model_data
+
+model_data %>% drop_na() -> model_data_comp
+pred <- predict(model, model_data_comp)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- model_data_comp$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+m1 <- glm(data$out ~ -1 + offset(data$logodds), family = binomial)
+data$m1_pred <- predict(m1, type = "response")
+
+cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot.pdf")
+```
+
+```{r}
+roc_plot(obs, probs, dir = mdl_folder, fn = "roc_plot.pdf")
+```

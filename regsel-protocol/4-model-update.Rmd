@@ -1,0 +1,235 @@
+---
+title: "Model update"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(Hmisc)
+```
+
+This notebook updates the model applying recalibration, and then adding one more predictor
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+Start by loading model:
+
+```{r}
+mdl_folder = "model-age-ct-symp"
+load(paste0(mdl_folder, "/model.RData"))
+```
+
+Second, loading data:
+
+```{r}
+test_data_file = 'drc-data.csv' 
+all_test_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+  
+# Renaming variables so the model can be applied on the data
+all_test_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain
+    ) -> test_data
+
+test_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+
+test_data %>% drop_na() -> test_data
+
+test_data
+```
+
+1. RECALIBRATION
+
+The model recalibration follows the methods described in
+
+https://darrendahly.github.io/post/homr/
+
+1.2 Recalibration on the large 
+
+Only the intercept is refitted:
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+m2 <- glm(data$out ~ 1 + offset(data$logodds), family = binomial)
+m2
+
+data$m2_pred <- predict(m2, type = "response")
+
+cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_on_the_large.pdf")
+```
+
+1.2 Logistic recalibration
+
+Both the intercept and slope are refitted:
+
+```{r}
+m3 <- glm(data$out ~ 1 + data$logodds, family = binomial)
+m3
+
+data$m3_pred <- predict(m3, type = "response")
+
+cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_logistic.pdf")
+```
+
+2. ADDING PREDICTOR TO MODEL
+
+Applying the "recalibration with extension method described" in:
+
+https://bmcmedresmethodol.biomedcentral.com/articles/10.1186/s12874-016-0231-2
+
+First, looking for the lab result that has highest correlation with outcome
+
+```{r}
+lab_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+
+all_test_data %>%
+ select(S7.FinalStatus, Lab.AmLyteGLU.D1.D2, Lab.AmLyteCRE.D1.D2, Lab.AmLyteALB.D1.D2, Lab.AmLyteAST.D1.D2, Lab.AmLyteAMY.D1.D2, Lab.AmLyteK.D1.D2, 
+    Lab.AmLyteCRP.D1.D2, Lab.AmLyteBUN.D1.D2, Lab.AmLyteTBIL.D1.D2, Lab.AmLyteALT.D1.D2, Lab.AmLyteCK.D1.D2, Lab.AmLyteNa.D1.D2, Lab.AmLyteCa.D1.D2) -> lab_data
+
+lab_data
+```
+
+```{r}
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+    )
+}
+
+res <- cor(lab_data)
+res2 <- rcorr(as.matrix(lab_data))
+res3 <- flattenCorrMatrix(res2$r, res2$P)
+res3
+```
+
+From inspecting the table below, the only lab results with significant correlation with outcome are:
+Lab.AmLyteALT.D1.D2 (c=0.57, P=5.83-04), 
+Lab.AmLyteAST.D1.D2 (c=0.56, P=2.8e-03), and 
+Lab.AmLyteCK.D1.D2 (c=0.51, P=3.6e-03)
+
+Let's build new models where these variables are added as a new predictor
+
+```{r}
+all_test_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain,
+    ALT = Lab.AmLyteALT.D1.D2,
+    AST = Lab.AmLyteAST.D1.D2,
+    CK = Lab.AmLyteCK.D1.D2
+    ) -> test_data_labs
+```
+
+1. ALT
+
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain, ALT) -> test_data
+
+test_data %>% drop_na() -> test_data
+test_data
+```
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+
+m1 <- glm(data$out ~ 1 + data$logodds + test_data$ALT, family = binomial)
+m1
+
+data$m1_pred <- predict(m1, type = "response")
+
+cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt.pdf")
+roc_plot(data$out, data$m1_pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt.pdf")
+```
+
+2. AST
+
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain, AST) -> test_data
+
+test_data %>% drop_na() -> test_data
+test_data
+```
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+
+m2 <- glm(data$out ~ 1 + data$logodds + test_data$AST, family = binomial)
+m2
+
+data$m2_pred <- predict(m2, type = "response")
+
+cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ast.pdf")
+roc_plot(data$out, data$m2_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast.pdf")
+```
+
+2. CK
+
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain, CK) -> test_data
+
+test_data %>% drop_na() -> test_data
+test_data
+```
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+
+m3 <- glm(data$out ~ 1 + data$logodds + test_data$CK, family = binomial)
+m3
+
+data$m3_pred <- predict(m3, type = "response")
+
+cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ck.pdf")
+roc_plot(data$out, data$m3_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ck.pdf")
+```

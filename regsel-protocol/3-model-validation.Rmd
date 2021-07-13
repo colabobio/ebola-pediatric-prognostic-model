@@ -1,0 +1,78 @@
+---
+title: "Model validation"
+output:
+  html_document:
+    df_print: paged
+---
+
+This notebook validates the prognostic model generated from EDP dataset on the DRC data.
+
+```{r message=FALSE, cache=F}
+source('./mdl-evaluation.R')
+```
+
+Fist, loading model:
+
+```{r}
+mdl_folder = "model-age-ct-symp"
+load(paste0(mdl_folder, "/model.RData"))
+```
+
+Second, loading data:
+
+```{r}
+test_data_file = 'drc-data.csv' 
+test_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
+  
+# Renaming variables so the model can be applied on the data
+test_data %>% 
+  rename(
+    Death = S7.FinalStatus,
+    PatientAge = AD.Age,
+    CT = Lab.CtNP.D1,
+    AnyBleeding = S2.Bleeding,
+    Diarrhoea = S2.Diarrhea,
+    Breathlessness = S2.DifficultyBreathing, 
+    SwallowingProblems = S2.DifficultySwallowing,
+    Anorexia = S2.AppetiteLoss,
+    BoneMusclePain = S2.JoinMusclePain
+    ) -> test_data
+
+test_data %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+
+test_data %>% drop_na() -> test_data
+
+test_data
+```
+
+Generate calibration and ROC plots
+
+```{r}
+pred <- predict(model, test_data)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data$Death
+
+data = data.frame(out = obs, prob = probs)
+data$logodds = log(data$prob / (1-data$prob))
+m1 <- glm(data$out ~ -1 + offset(data$logodds), family = binomial)
+data$m1_pred <- predict(m1, type = "response")
+
+cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_validation.pdf")
+```
+
+The plot above shows that the model is not well calibrated. The test below quantifies that:
+
+```{r}
+library(ResourceSelection)
+hl <- hoslem.test(data$out, data$prob, g=10)
+print(hl)
+```
+
+The test rejects the null hypothesis of predicted and observed probabilities being the same.
+
+Finally, the ROC plot including the AUC with CIs:
+
+```{r}
+roc_plot(obs, probs, dir = mdl_folder, fn = "roc_plot_validation.pdf")
+```
