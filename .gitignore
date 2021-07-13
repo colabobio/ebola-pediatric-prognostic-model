@@ -2,5 +2,9 @@
 .Rapp.history
 .ipynb_checkpoints
 
+*.xlsl
 *.csv
+*.html
+
 regsel-protocol-jupyter/model-*
+regsel-protocol/model-*
