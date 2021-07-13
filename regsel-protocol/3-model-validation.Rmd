@@ -5,6 +5,10 @@ output:
     df_print: paged
 ---
 
+```{r setup, include=FALSE}
+library(tidyr)
+```
+
 This notebook validates the prognostic model generated from EDP dataset on the DRC data.
 
 ```{r message=FALSE, cache=F}

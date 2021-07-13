@@ -13,6 +13,8 @@ library(Hmisc)
 library(glmnet)
 library(mvnormtest)
 library(naniar)
+library(dplyr)
+library(tidyr)
 ```
 
 ```{r message=FALSE, cache=F}
@@ -265,7 +267,7 @@ dev.off()
 plot(summary(f), log=TRUE)
 ```
 
-The saturated model has a AUC (C statistic) on the training data of 0.783, and an optimism in Dxy of 0.0709. Since C and Dxy are related by C = 0.5 + Dxy/2, the optimism corrected C is ~0.76, so the saturated model has a degree of overfitting to the data, although is not too bad. Some clinical symptoms have ORs lower than 1. This seems to indicate they increase the odds of survival, which does not make medical sense.
+The saturated model has a AUC (C statistic) on the training data of 0.787, and an optimism in Dxy of 0.0709. Since C and Dxy are related by C = 0.5 + Dxy/2, the optimism corrected C is ~0.76, so the saturated model has a degree of overfitting to the data, although is not too bad. Some clinical symptoms have ORs lower than 1. This seems to indicate they increase the odds of survival, which does not make medical sense.
 
 3.b Variable selection with penalized regression
 
