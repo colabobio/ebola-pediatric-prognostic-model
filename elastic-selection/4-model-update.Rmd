@@ -7,6 +7,9 @@ output:
 
 ```{r setup, include=FALSE}
 library(Hmisc)
+library(rms)
+library(tidyr)
+library(dplyr)
 ```
 
 This notebook updates the model applying recalibration, and then adding one more predictor

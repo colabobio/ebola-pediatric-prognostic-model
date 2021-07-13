@@ -6,5 +6,5 @@
 *.csv
 *.html
 
-regsel-protocol-jupyter/model-*
-regsel-protocol/model-*
+jupyter-notebooks/model-*
+elastic-selection/model-*

@@ -6,6 +6,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+library(rms)
+library(dplyr)
 library(tidyr)
 ```
 

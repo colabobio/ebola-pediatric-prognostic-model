@@ -8,13 +8,13 @@ output:
 This notebook generates the prognostic model using the EDP dataset as training.
 
 ```{r setup, include=FALSE}
-library(rms)
+library(dplyr)
+library(tidyr)
 library(Hmisc)
+library(rms)
 library(glmnet)
 library(mvnormtest)
 library(naniar)
-library(dplyr)
-library(tidyr)
 ```
 
 ```{r message=FALSE, cache=F}
@@ -244,11 +244,11 @@ sat_update <- update(sat_model, x=TRUE, y=TRUE)
 sat_val <- validate(sat_update, B=num_boot)
 sat_cal <- calibrate(sat_update, B=num_boot)
 
-# Calculate distribution summaries for potential predictor variables
-sat_datadist <- datadist(getImpute(impute = sat_impute, im = 1))
-
 saveDescription(f=sat_model, vars=sat_vars, dir=sat_folder)
 saveEvaluation(an=sat_anova, val=sat_val, cal=sat_cal, dir=sat_folder)
+
+# Calculate distribution summaries for potential predictor variables
+sat_datadist <- datadist(getImpute(impute = sat_impute, im = 1))
 
 options(datadist='sat_datadist')
 dir <- sat_folder
@@ -310,7 +310,16 @@ source('./mdl-evaluation.R')
 ```
 
 ```{r}
-parteff_plot(model, src_data, mdl_folder, "parteff_plot.pdf")
+# Partial effects (log odds scale) plot from RMS package. For more info check Harrel's
+# Regression Modeling Strategies (pp 281)
+dd <- datadist(src_data)
+options(datadist='dd')
+g <- ggplot(Predict(model), sepdiscrete='vertical', vnames='names', rdata=src_data, histSpike.opts=list(frac=function(model) .1*model/max(model) ))
+plot(g)
+
+pdf(paste0(dir, "/parteff_plot.pdf"), useDingbats=FALSE)
+plot(g)
+dev.off()
 ```
 
 ```{r}
