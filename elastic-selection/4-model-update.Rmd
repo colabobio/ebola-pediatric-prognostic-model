@@ -10,6 +10,7 @@ library(Hmisc)
 library(rms)
 library(tidyr)
 library(dplyr)
+library(ROCit)
 ```
 
 This notebook updates the model applying recalibration, and then adding one more predictor
@@ -183,6 +184,22 @@ cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn 
 roc_plot(data$out, data$m1_pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt.pdf")
 ```
 
+```{r}
+
+# Calculate perfromace measures using ROCit:
+# https://cran.r-project.org/web/packages/ROCit/index.html
+# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
+
+measure <- measureit(score = probs, class = obs,
+                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
+
+names(measure)
+plot(measure$ACC~measure$Cutoff, type = "l")
+plot(measure$SENS~measure$Cutoff, type = "l")
+plot(measure$SPEC~measure$Cutoff, type = "l")
+plot(measure$FSCR~measure$Cutoff, type = "l")
+```
+
 2. AST
 
 ```{r}
@@ -210,6 +227,22 @@ cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn 
 roc_plot(data$out, data$m2_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast.pdf")
 ```
 
+```{r}
+
+# Calculate perfromace measures using ROCit:
+# https://cran.r-project.org/web/packages/ROCit/index.html
+# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
+
+measure <- measureit(score = probs, class = obs,
+                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
+
+names(measure)
+plot(measure$ACC~measure$Cutoff, type = "l")
+plot(measure$SENS~measure$Cutoff, type = "l")
+plot(measure$SPEC~measure$Cutoff, type = "l")
+plot(measure$FSCR~measure$Cutoff, type = "l")
+```
+
 2. CK
 
 ```{r}
@@ -235,4 +268,20 @@ data$m3_pred <- predict(m3, type = "response")
 
 cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ck.pdf")
 roc_plot(data$out, data$m3_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ck.pdf")
+```
+
+```{r}
+
+# Calculate perfromace measures using ROCit:
+# https://cran.r-project.org/web/packages/ROCit/index.html
+# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
+
+measure <- measureit(score = probs, class = obs,
+                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
+
+names(measure)
+plot(measure$ACC~measure$Cutoff, type = "l")
+plot(measure$SENS~measure$Cutoff, type = "l")
+plot(measure$SPEC~measure$Cutoff, type = "l")
+plot(measure$FSCR~measure$Cutoff, type = "l")
 ```
