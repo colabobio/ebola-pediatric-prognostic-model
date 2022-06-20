@@ -291,11 +291,11 @@ sel_df
 3.c  Age + CT + selected symptoms model
 
 ```{r}
-mdl_vars <- c('PatientAge', 'CT', 'AnyBleeding', 'Diarrhoea', 'Breathlessness', 'SwallowingProblems', 'Anorexia', 'BoneMusclePain')
+mdl_vars <- c('PatientAge', 'CT', 'AnyBleeding', 'Diarrhoea', 'Breathlessness', 'SwallowingProblems')
 
 mdl_imp_formula <- "~Death+PatientAge+PatientSex+CT+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
 
-mdl_lgr_formula <- "Death~rcs(PatientAge,3)+rcs(CT,3)+AnyBleeding+Diarrhoea+Breathlessness+SwallowingProblems+Anorexia+BoneMusclePain"
+mdl_lgr_formula <- "Death~rcs(PatientAge,3)+rcs(CT,3)+AnyBleeding+Diarrhoea+Breathlessness+SwallowingProblems"
 
 mdl_folder <- "model-age-ct-symp"
 dir.create(mdl_folder)
@@ -324,7 +324,7 @@ dev.off()
 
 ```{r}
 src_data %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> model_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems) -> model_data
 
 model_data %>% drop_na() -> model_data_comp
 pred <- predict(model, model_data_comp)

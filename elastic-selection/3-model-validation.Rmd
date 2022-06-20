@@ -39,13 +39,11 @@ test_data %>%
     AnyBleeding = S2.Bleeding,
     Diarrhoea = S2.Diarrhea,
     Breathlessness = S2.DifficultyBreathing, 
-    SwallowingProblems = S2.DifficultySwallowing,
-    Anorexia = S2.AppetiteLoss,
-    BoneMusclePain = S2.JoinMusclePain
+    SwallowingProblems = S2.DifficultySwallowing
     ) -> test_data
 
 test_data %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems) -> test_data
 
 test_data %>% drop_na() -> test_data
 
