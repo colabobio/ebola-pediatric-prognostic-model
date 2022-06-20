@@ -27,7 +27,7 @@ load(paste0(mdl_folder, "/model.RData"))
 Second, loading data:
 
 ```{r}
-test_data_file = 'drc-data.csv' 
+test_data_file = 'drc-data-ctn.csv' 
 test_data <- read.table(test_data_file, sep=",", header=TRUE, na.strings="\\N")
   
 # Renaming variables so the model can be applied on the data
@@ -35,17 +35,15 @@ test_data %>%
   rename(
     Death = S7.FinalStatus,
     PatientAge = AD.Age,
-    CT = Lab.CtNP.D1,
+    CT = CT.D1,
     AnyBleeding = S2.Bleeding,
     Diarrhoea = S2.Diarrhea,
-    Breathlessness = S2.DifficultyBreathing, 
-    SwallowingProblems = S2.DifficultySwallowing,
-    Anorexia = S2.AppetiteLoss,
-    BoneMusclePain = S2.JoinMusclePain
+    Breathlessness = S2.DifficultyBreathing,
+    SwallowingProblems = S2.DifficultySwallowing
     ) -> test_data
 
 test_data %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> test_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems) -> test_data
 
 test_data %>% drop_na() -> test_data
 

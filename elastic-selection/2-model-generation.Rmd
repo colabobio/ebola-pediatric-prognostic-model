@@ -24,7 +24,7 @@ source('./var-selection.R')
 1. DATA SETUP
 
 ```{r}
-src_data_file <- "edp-data.csv"
+src_data_file <- "edp-data-ctn.csv"
 
 out_var = "Death"
 
@@ -43,6 +43,8 @@ conarky_data <- src_data[src_data$SiteID == "CONAKRY", ]
 nzerekore_data <- src_data[src_data$SiteID == "CTE-NZEREKORE", ]
 elwa_data <- src_data[src_data$SiteID == "ELWA3", ]
 msfbo_data <- src_data[src_data$SiteID == "MSF_Bo", ]
+msfkail_data <- df_edp[df_edp$SiteID == "MSF_Kail", ]
+msfmag_data <- df_edp[df_edp$SiteID == "MSF_Mag", ]
 bong_data <- src_data[src_data$SiteID == "1-Bong", ]
 lunsar_data <- src_data[src_data$SiteID == "2-Lunsar", ]
 margibi_data <- src_data[src_data$SiteID == "3-Margibi", ]
@@ -183,11 +185,24 @@ print(res$missing.patterns)
 print("")
 ```
 
-Removal of the high missingness variables in ELWA data results in accepting MCAR. Now, examining CTE-NZEREKORE, 1-Bongo, 3-Margibi, and 4-Kambia visually because those cause the MCAR test to crash
+Removal of the high missingness variables in ELWA data results in accepting MCAR. Now, examining CTE-NZEREKORE, MSF-Kail, MSF-Mag, 1-Bongo, 3-Margibi, and 4-Kambia visually because those cause the MCAR test to crash
 
 ```{r}
 print("CTE-NZEREKORE")
 test_data <- nzerekore_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+
+```{r}
+print("MSF_Kail")
+test_data <- msfkail_data[unlist(test_vars)]
+vis_miss(test_data)
+```
+
+```{r}
+print("MSF_Mag")
+test_data <- msfmag_data[unlist(test_vars)]
 vis_miss(test_data)
 ```
 
@@ -209,7 +224,7 @@ test_data <- kambia_data[unlist(test_vars)]
 vis_miss(test_data)
 ```
 
-In all these cases the results of the test failing to run is because of entire columns missing. Removal of those would result in MCAR.
+In all these cases the results of the test failing to run is because of entire columns missing, or no missing data. Removal of those would result in MCAR.
 
 3. MODEL BUILDING
 
@@ -218,7 +233,6 @@ In all these cases the results of the test failing to run is because of entire c
 We start by fitting a logistic regression model on all the variables.
 
 ```{r}
-
 sat_vars <- pred_vars
 
 sat_imp_formula <- "~Death+PatientAge+PatientSex+CT+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
@@ -267,7 +281,7 @@ dev.off()
 plot(summary(f), log=TRUE)
 ```
 
-The saturated model has a AUC (C statistic) on the training data of 0.787, and an optimism in Dxy of 0.0709. Since C and Dxy are related by C = 0.5 + Dxy/2, the optimism corrected C is ~0.76, so the saturated model has a degree of overfitting to the data, although is not too bad. Some clinical symptoms have ORs lower than 1. This seems to indicate they increase the odds of survival, which does not make medical sense.
+The saturated model has a AUC (C statistic) on the training data of 0.780, and an optimism in Dxy of 0.0652. Since C and Dxy are related by C = 0.5 + Dxy/2, the optimism corrected C is ~0.754, so the saturated model has a degree of overfitting to the data, although is not too bad. Some clinical symptoms have ORs lower than 1. This seems to indicate they increase the odds of survival, which does not make medical sense.
 
 3.b Variable selection with penalized regression
 
@@ -279,7 +293,7 @@ We are looking for variables that consistenly show non-negative coefficients sin
 selection <- selectVariables(random_seed, num_imp, sat_imp_formula, src_data, TRUE)
 ```
 
-We set the threshold for keeping a variable at +50% in the above list, meaning that the corresponding regression coefficient had to be positive at least in half of the models to be selected. As mentioned CT has a negative coefficient, and patient age and fever temperature are pre-determined, so we will only look at sign/symptoms above that threshold:
+We set the threshold for keeping a variable at +90% in the above list, meaning that the corresponding regression coefficient had to be positive at least in half of the models to be selected. As mentioned CT has a negative coefficient, and patient age and fever temperature are pre-determined, so we will only look at sign/symptoms above that threshold:
 
 ```{r}
 sel_df <- data.frame(unlist(selection$names), unlist(selection$counts))
@@ -291,11 +305,11 @@ sel_df
 3.c  Age + CT + selected symptoms model
 
 ```{r}
-mdl_vars <- c('PatientAge', 'CT', 'AnyBleeding', 'Diarrhoea', 'Breathlessness', 'SwallowingProblems', 'Anorexia', 'BoneMusclePain')
+mdl_vars <- c('PatientAge', 'CT', 'AnyBleeding', 'Diarrhoea', 'Breathlessness', 'SwallowingProblems')
 
 mdl_imp_formula <- "~Death+PatientAge+PatientSex+CT+AbdominalPain+Anorexia+AnyBleeding+JointPain+AstheniaWeakness+BoneMusclePain+Vomit+Diarrhoea+Breathlessness+Headache+SwallowingProblems+Fever+Hiccups+Nausea+Conjunctivitis"
 
-mdl_lgr_formula <- "Death~rcs(PatientAge,3)+rcs(CT,3)+AnyBleeding+Diarrhoea+Breathlessness+SwallowingProblems+Anorexia+BoneMusclePain"
+mdl_lgr_formula <- "Death~rcs(PatientAge,3)+rcs(CT,3)+AnyBleeding+Diarrhoea+Breathlessness+SwallowingProblems"
 
 mdl_folder <- "model-age-ct-symp"
 dir.create(mdl_folder)
@@ -324,7 +338,7 @@ dev.off()
 
 ```{r}
 src_data %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, Anorexia, BoneMusclePain) -> model_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems) -> model_data
 
 model_data %>% drop_na() -> model_data_comp
 pred <- predict(model, model_data_comp)

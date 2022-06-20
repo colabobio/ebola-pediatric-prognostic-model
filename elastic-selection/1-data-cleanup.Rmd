@@ -14,11 +14,16 @@ library(dplyr)
 
 ```{r}
 df <- read.table("drc-data-orig.csv", sep=",", header=TRUE, na.strings="")
+print(paste0("Total number of patients = ", nrow(df)))
 ```
 
 ```{r}
 # Removing cases with LOS less than 24 hours
 df <- subset(df, LOS_bin_new != "<24h")
+print(paste0("Number of patients surviving 24+ hours = ", nrow(df)))
+
+print(paste0("Number of patients with missing outcome = ", sum(is.na(df$S7.FinalStatus))))
+
 
 # Inverting outcome value (1=alive, 0=dead, but opposite is needed in prog model)
 df$S7.FinalStatus <- 1 - df$S7.FinalStatus
@@ -47,3 +52,49 @@ https://www.marsja.se/r-add-column-to-dataframe-based-on-other-columns-condition
 https://stackoverflow.com/questions/54774280/plyrddply-equivalent-in-dplyr
 
 But for the time being it was easier to just to manually since the number of rows is not too high.
+
+The manually-edited file is "drc-data.csv"
+
+
+
+NORMALIZE CT VALUES FOR EDP AND DRC
+
+```{r}
+# Normalizing CT values in DRC data
+df_drc <- read.table("drc-data.csv", sep=",", header=TRUE, na.strings="\\N")
+df_drc$CT.D1 <- (df_drc$Lab.CtNP.D1 - mean(df_drc$Lab.CtNP.D1, na.rm=T))/sd(df_drc$Lab.CtNP.D1, na.rm=T)
+df_drc[is.na(df_drc)] <- "\\N"
+write.table(df_drc, file="drc-data-ctn.csv", sep = ",", row.names = FALSE)
+```
+
+```{r}
+# Normalizing CT values in EDP data
+df_edp <- read.table("edp-data.csv", sep=",", header=TRUE, na.strings="\\N")
+df_conarky <- df_edp[df_edp$SiteID == "CONAKRY", ]
+df_nzerekore <- df_edp[df_edp$SiteID == "CTE-NZEREKORE", ]
+df_elwa <- df_edp[df_edp$SiteID == "ELWA3", ]
+df_msfbo <- df_edp[df_edp$SiteID == "MSF_Bo", ]
+df_msfkail <- df_edp[df_edp$SiteID == "MSF_Kail", ]
+df_msfmag <- df_edp[df_edp$SiteID == "MSF_Mag", ]
+df_bong <- df_edp[df_edp$SiteID == "1-Bong", ]
+df_lunsar <- df_edp[df_edp$SiteID == "2-Lunsar", ]
+df_margibi <- df_edp[df_edp$SiteID == "3-Margibi", ]
+df_kambia <- df_edp[df_edp$SiteID == "4-Kambia", ]
+df_makeni <- df_edp[df_edp$SiteID == "5-Makeni", ]
+
+df_conarky$CT <- (df_conarky$CT - mean(df_conarky$CT, na.rm=T))/sd(df_conarky$CT, na.rm=T)
+df_nzerekore$CT <- (df_nzerekore$CT - mean(df_nzerekore$CT, na.rm=T))/sd(df_nzerekore$CT, na.rm=T)
+df_elwa$CT <- (df_elwa$CT - mean(df_elwa$CT, na.rm=T))/sd(df_elwa$CT, na.rm=T)
+df_msfbo$CT <- (df_msfbo$CT - mean(df_msfbo$CT, na.rm=T))/sd(df_msfbo$CT, na.rm=T)
+df_msfkail$CT <- (df_msfkail$CT - mean(df_msfkail$CT, na.rm=T))/sd(df_msfkail$CT, na.rm=T)
+df_msfmag$CT <- (df_msfmag$CT - mean(df_msfmag$CT, na.rm=T))/sd(df_msfmag$CT, na.rm=T)
+df_bong$CT <- (df_bong$CT - mean(df_bong$CT, na.rm=T))/sd(df_bong$CT, na.rm=T)
+df_lunsar$CT <- (df_lunsar$CT - mean(df_lunsar$CT, na.rm=T))/sd(df_lunsar$CT, na.rm=T)
+df_margibi$CT <- (df_margibi$CT - mean(df_margibi$CT, na.rm=T))/sd(df_margibi$CT, na.rm=T)
+df_kambia$CT <- (df_kambia$CT - mean(df_kambia$CT, na.rm=T))/sd(df_kambia$CT, na.rm=T)
+df_makeni$CT <- (df_makeni$CT - mean(df_makeni$CT, na.rm=T))/sd(df_makeni$CT, na.rm=T)
+
+df_edp <- rbind(df_conarky, df_nzerekore, df_elwa, df_msfbo, df_msfkail, df_msfmag, df_bong, df_lunsar, df_margibi, df_kambia, df_makeni)
+df_edp[is.na(df_edp)] <- "\\N"
+write.table(df_edp, file="edp-data-ctn.csv", sep = ",", row.names = FALSE)
+```
