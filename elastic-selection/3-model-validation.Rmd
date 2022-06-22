@@ -7,6 +7,7 @@ output:
 
 ```{r setup, include=FALSE}
 library(rms)
+library(caret)
 library(dplyr)
 library(tidyr)
 ```
@@ -75,8 +76,15 @@ print(hl)
 
 The test rejects the null hypothesis of predicted and observed probabilities being the same.
 
-Finally, the ROC plot including the AUC with CIs:
+The ROC plot including the AUC with CIs:
 
 ```{r}
 roc_plot(obs, probs, dir = mdl_folder, fn = "roc_plot_validation.pdf")
+```
+
+Finally, the confusion matrix is calculated below:
+
+```{r}
+conf <- confusionMatrix(data=as.factor(as.integer(probs > 0.5)), reference = as.factor(obs))
+conf
 ```
