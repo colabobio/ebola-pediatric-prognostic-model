@@ -1,6 +1,6 @@
 # Machine learning prediction of EVD survival in pediatric patients
 
-This repository contains the code to construct, validate, and update machine learning models for prognosis prediction in pediatric patients of Ebola Virus Disease (EVD).
+This repository contains the code to construct, validate, and update the EVD Prognosis in Children (EPiC) model for prognosis prediction in pediatric patients of Ebola Virus Disease (EVD).
 
 The code is organized in two folders:
 
