@@ -1,0 +1,36 @@
+Logistic Regression Model
+ 
+ fit.mult.impute(formula = as.formula(sat_lgr_formula), fitter = lrm, 
+     xtrans = sat_impute, data = src_data)
+ 
+                        Model Likelihood    Discrimination    Rank Discrim.    
+                              Ratio Test           Indexes          Indexes    
+ Obs           579    LR chi2     163.00    R2       0.331    C       0.787    
+  0            345    d.f.            20    g        1.457    Dxy     0.574    
+  1            234    Pr(> chi2) <0.0001    gr       4.310    gamma   0.574    
+ max |deriv| 2e-07                          gp       0.282    tau-a   0.277    
+                                            Brier    0.179                     
+ 
+                    Coef    S.E.   Wald Z Pr(>|Z|)
+ Intercept           7.3067 1.4993  4.87  <0.0001 
+ PatientAge         -0.3502 0.0630 -5.56  <0.0001 
+ PatientAge'         0.2858 0.0662  4.32  <0.0001 
+ PatientSex         -0.0514 0.2133 -0.24  0.8095  
+ CT                 -0.2172 0.0625 -3.48  0.0005  
+ CT'                 0.1516 0.0820  1.85  0.0644  
+ AbdominalPain      -0.1516 0.2549 -0.59  0.5521  
+ Anorexia            0.2655 0.3019  0.88  0.3792  
+ AnyBleeding         0.3246 0.3169  1.02  0.3057  
+ JointPain          -0.0613 0.3166 -0.19  0.8465  
+ AstheniaWeakness   -0.9274 0.3128 -2.97  0.0030  
+ BoneMusclePain     -0.0224 0.3119 -0.07  0.9426  
+ Vomit              -0.1950 0.5299 -0.37  0.7129  
+ Diarrhoea           0.4399 0.2589  1.70  0.0893  
+ Breathlessness      0.6119 0.3747  1.63  0.1025  
+ Headache           -0.1244 0.2416 -0.51  0.6067  
+ SwallowingProblems  0.6395 0.3129  2.04  0.0410  
+ Fever              -0.2709 0.3370 -0.80  0.4214  
+ Hiccups            -0.2580 0.4501 -0.57  0.5665  
+ Nausea              0.1673 0.5397  0.31  0.7566  
+ Conjunctivitis     -0.3252 0.3731 -0.87  0.3834  
+ 

@@ -1,0 +1,25 @@
+                Wald Statistics          Response: Death 
+
+ Factor             Chi-Square d.f. P     
+ PatientAge         35.37       2   <.0001
+  Nonlinear         18.66       1   <.0001
+ PatientSex          0.06       1   0.8095
+ CT                 20.55       2   <.0001
+  Nonlinear          3.42       1   0.0644
+ AbdominalPain       0.35       1   0.5521
+ Anorexia            0.77       1   0.3792
+ AnyBleeding         1.05       1   0.3057
+ JointPain           0.04       1   0.8465
+ AstheniaWeakness    8.79       1   0.0030
+ BoneMusclePain      0.01       1   0.9426
+ Vomit               0.14       1   0.7129
+ Diarrhoea           2.89       1   0.0893
+ Breathlessness      2.67       1   0.1025
+ Headache            0.26       1   0.6067
+ SwallowingProblems  4.18       1   0.0410
+ Fever               0.65       1   0.4214
+ Hiccups             0.33       1   0.5665
+ Nausea              0.10       1   0.7566
+ Conjunctivitis      0.76       1   0.3834
+ TOTAL NONLINEAR    22.85       2   <.0001
+ TOTAL              83.66      20   <.0001

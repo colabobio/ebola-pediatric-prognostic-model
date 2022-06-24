@@ -1,0 +1,13 @@
+                Wald Statistics          Response: Death 
+
+ Factor             Chi-Square d.f. P     
+ PatientAge         57.42      2    <.0001
+  Nonlinear         23.34      1    <.0001
+ CT                 21.47      2    <.0001
+  Nonlinear          3.79      1    0.0515
+ AnyBleeding         1.14      1    0.2861
+ Diarrhoea           1.54      1    0.2146
+ Breathlessness      1.09      1    0.2954
+ SwallowingProblems  2.50      1    0.1141
+ TOTAL NONLINEAR    28.22      2    <.0001
+ TOTAL              77.89      8    <.0001

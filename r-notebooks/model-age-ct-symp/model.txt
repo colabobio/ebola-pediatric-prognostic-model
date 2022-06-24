@@ -1,0 +1,24 @@
+Logistic Regression Model
+ 
+ fit.mult.impute(formula = as.formula(model_formula), fitter = lrm, 
+     xtrans = imp_data, data = train_data)
+ 
+                        Model Likelihood    Discrimination    Rank Discrim.    
+                              Ratio Test           Indexes          Indexes    
+ Obs           579    LR chi2     143.87    R2       0.297    C       0.770    
+  0            345    d.f.             8    g        1.320    Dxy     0.540    
+  1            234    Pr(> chi2) <0.0001    gr       3.757    gamma   0.541    
+ max |deriv| 1e-06                          gp       0.265    tau-a   0.261    
+                                            Brier    0.186                     
+ 
+                    Coef    S.E.   Wald Z Pr(>|Z|)
+ Intercept           6.5164 1.3712  4.75  <0.0001 
+ PatientAge         -0.3806 0.0577 -6.60  <0.0001 
+ PatientAge'         0.3034 0.0628  4.83  <0.0001 
+ CT                 -0.2139 0.0597 -3.58  0.0003  
+ CT'                 0.1545 0.0794  1.95  0.0515  
+ AnyBleeding         0.3245 0.3042  1.07  0.2861  
+ Diarrhoea           0.2672 0.2153  1.24  0.2146  
+ Breathlessness      0.3624 0.3464  1.05  0.2954  
+ SwallowingProblems  0.4270 0.2702  1.58  0.1141  
+ 
