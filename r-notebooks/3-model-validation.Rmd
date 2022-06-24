@@ -7,9 +7,11 @@ output:
 
 ```{r setup, include=FALSE}
 library(rms)
-library(caret)
 library(dplyr)
 library(tidyr)
+
+library(caret)
+library(ResourceSelection)
 ```
 
 This notebook validates the prognostic model generated from EDP dataset on the DRC data.
@@ -61,6 +63,8 @@ obs <- test_data$Death
 data = data.frame(out = obs, prob = probs)
 data$logodds = log(data$prob / (1-data$prob))
 m1 <- glm(data$out ~ -1 + offset(data$logodds), family = binomial)
+m1
+
 data$m1_pred <- predict(m1, type = "response")
 
 cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_validation.pdf")
@@ -69,7 +73,6 @@ cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn 
 The plot above shows that the model is not well calibrated. The test below quantifies that:
 
 ```{r}
-library(ResourceSelection)
 hl <- hoslem.test(data$out, data$prob, g=10)
 print(hl)
 ```
@@ -82,9 +85,26 @@ The ROC plot including the AUC with CIs:
 roc_plot(obs, probs, dir = mdl_folder, fn = "roc_plot_validation.pdf")
 ```
 
+```{r}
+
+# Calculate perfromace measures using ROCit:
+# https://cran.r-project.org/web/packages/ROCit/index.html
+# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
+
+measure <- measureit(score = probs, class = obs,
+                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
+
+names(measure)
+plot(measure$ACC~measure$Cutoff, type = "l")
+plot(measure$SENS~measure$Cutoff, type = "l")
+plot(measure$SPEC~measure$Cutoff, type = "l")
+plot(measure$FSCR~measure$Cutoff, type = "l")
+```
+
 Finally, the confusion matrix is calculated below:
 
 ```{r}
-conf <- confusionMatrix(data=as.factor(as.integer(probs > 0.5)), reference = as.factor(obs))
+conf <- confusionMatrix(data=as.factor(as.integer(probs > 0.63)), reference = as.factor(obs), positive = "1")
 conf
+saveToTXT(conf, mdl_folder, "conf_matrix.txt")
 ``` 
