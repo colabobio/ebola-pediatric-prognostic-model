@@ -1,0 +1,116 @@
+---
+title: "Map plotting"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(tmap)
+library(grid)
+library(sf)
+library(dplyr)
+```
+
+This notebook generates the map of West Africa showing the locations of all the ETUs included in the derivation dataset.
+
+```{r}
+#Make new geometry coordinate
+p1 = st_point(c(-9.6333,6.9667)) #Bong County, Liberia 
+g1 = st_sfc(p1, crs = 4326)
+
+p2 = st_point(c(-12.535539,8.688128)) #Lunsar, Port Loko District, Sierra Leone
+g2 = st_sfc(p2, crs = 4326)
+
+p3 = st_point(c(-10.31667, 6.55)) #Margibi County, Liberia
+g3 = st_sfc(p3, crs = 4326)
+
+p4 = st_point(c(-12.917652,9.126166)) #Kambia, Sierra Leone
+g4 = st_sfc(p4, crs = 4326)
+
+p5 = st_point(c(-12.037556,8.871975)) #Makeni, Sierra Leone
+g5 = st_sfc(p5, crs = 4326)
+
+p6 = st_point(c(-13.712222,9.509167)) #Conakry, Guinea 
+g6 = st_sfc(p6, crs = 4326)
+
+p7 = st_point(c(-8.825250,7.747836)) #Nzérékoré, Guinea
+g7 = st_sfc(p7, crs = 4326)
+
+p8 = st_point(c(-10.797160,6.300774)) #ELWA 3 in Monrovia, Liberia?
+g8 = st_sfc(p8, crs = 4326)
+
+p9 = st_point(c(-11.740995,7.955179)) #Bo, Sierra Leone
+g9 = st_sfc(p9, crs = 4326)
+# 
+# p10 = st_point(c()) #
+# g10 = st_sfc(p10, crs = 4326)
+# 
+# p11 = st_point(c()) #
+# g11 = st_sfc(p11, crs = 4326)
+
+ETU <-data.frame (name = c('Bong County', 'Lunsar', 'Margibi', 'Kambia', 'Makeni', 'Conakry', 'Nzerekore', 'ELWA3', 'Bo'),
+                  iso_a3 = c('LBR', 'SLE', 'LBR', 'SLE', 'SLE', 'GIN', 'GIN', 'LBR', 'SLE'),
+                  cases = c(35, 47, 3, 9, 26, 103, 17, 220, 112),
+                  geometry = c(g1, g2, g3, g4, g5, g6, g7, g8, g9),
+                  CFR = c(43, 51, 30, 78, 73, 34, 71, 36, 38))
+ETU <- st_sf(ETU)
+
+data(World)
+Africa <- World %>%
+  subset(continent == 'Africa')
+
+GLS <- st_bbox(World %>% filter(name %in% c("Guinea", "Liberia", "Sierra Leone"))) #set borders for map
+
+Africa[20,]$name <- '-' #change Guinea-Bissau name so it doesn't show on plot
+
+tmap_mode("plot")
+smallmap <- tm_shape(Africa, bbox = GLS)  +
+  tm_borders() +
+    tm_fill("grey70") +
+tm_shape(ETU) +
+  tm_text('name', size = 1, ymod=-1) +
+    tm_bubbles(size = "cases", col = "CFR", alpha = .5, 
+        border.alpha = .01, 
+        scale = 4,
+        style="fixed", breaks=c(-Inf, seq(40, 70, by=10), Inf),
+        palette="OrRd", contrast=1, 
+        title.size="Cases", 
+        title.col="CFR (%)") + 
+tm_format("World") +
+  tm_shape(Africa) +
+	tm_text(text = 'name', size = 1.5, ymod=4, xmod=-1.5, col = '#696969') +
+  tm_layout(bg.color = "white") +
+  tm_layout(frame = T,
+          legend.text.size = 1,
+          legend.position = c("left","bottom"),
+          legend.bg.alpha = 1) 
+
+tmap_save(tm = smallmap, filename = './smallmap.tiff')
+```
+
+
+```{r}
+GLS <- st_as_sfc(GLS)
+DRC <- Africa[9,]
+DRC$name <- as.character(DRC$name)
+DRC$name <- "DR Congo"
+
+largemap <- tm_shape(Africa) + tm_fill("grey70") +
+  tm_shape(GLS) + tm_borders(lwd = 3) + 
+  tm_shape(DRC) +
+  tm_symbols(col = "black", scale = .5) +
+  tm_text('name', size = .7, ymod = .6) 
+
+tmap_save(tm = largemap, filename = './largemap.tiff')
+```
+
+```{r}
+pdf('./figure-1.pdf')
+smallmap
+print(largemap, vp = viewport(.75, 0.79, width = 0.3, height = 0.3))
+dev.off()
+```
+
+
