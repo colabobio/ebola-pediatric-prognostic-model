@@ -1,5 +1,11 @@
 # Some utility functions in R for model evaluation
 
+saveToTXT <- function(obj, dir, fn) {
+  sink(paste0(dir, "/", fn), append=FALSE, split=FALSE)
+  print(obj)
+  sink()    
+}
+
 # Partial effects (log odds scale) plot from RMS package. For more info check Harrel's
 # Regression Modeling Strategies (pp 281)
 parteff_plot <- function(model, data, dir, fn, ...) {
