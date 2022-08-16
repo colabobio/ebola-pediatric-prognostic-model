@@ -75,6 +75,9 @@ m2
 data$m2_pred <- predict(m2, type = "response")
 
 cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_on_the_large.pdf")
+res <- cal_coeff(data, "m2_pred")
+res
+saveToTXT(res, mdl_folder, "cal_plot_recalibration_on_the_large_coefficients.txt")
 ```
 
 1.2 Logistic recalibration
@@ -88,6 +91,9 @@ m3
 data$m3_pred <- predict(m3, type = "response")
 
 cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_logistic.pdf")
+res <- cal_coeff(data, "m3_pred")
+res
+saveToTXT(res, mdl_folder, "cal_plot_recalibration_logistic_coefficients.txt")
 ```
 
 2. ADDING PREDICTOR TO MODEL
@@ -177,6 +183,10 @@ m1
 data$m1_pred <- predict(m1, type = "response")
 
 cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt.pdf")
+res <- cal_coeff(data, "m1_pred")
+res
+saveToTXT(res, mdl_folder, "cal_plot_validation_with_alt_coefficients.txt")
+
 roc_plot(data$out, data$m1_pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt.pdf")
 ```
 
@@ -220,6 +230,10 @@ m2
 data$m2_pred <- predict(m2, type = "response")
 
 cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ast.pdf")
+res <- cal_coeff(data, "m2_pred")
+res
+saveToTXT(res, mdl_folder, "cal_plot_validation_with_ast_coefficients.txt")
+
 roc_plot(data$out, data$m2_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast.pdf")
 ```
 
@@ -263,6 +277,10 @@ m3
 data$m3_pred <- predict(m3, type = "response")
 
 cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ck.pdf")
+res <- cal_coeff(data, "m3_pred")
+res
+saveToTXT(res, mdl_folder, "cal_plot_validation_with_ck_coefficients.txt")
+
 roc_plot(data$out, data$m3_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ck.pdf")
 ```
 
