@@ -42,7 +42,7 @@ cal_plot <- function(model, data, model_name, pred_var, model_label, dir, fn, ..
     scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) +
     geom_abline() + # 45 degree line indicating perfect calibration
     geom_smooth(method = "lm", se = FALSE, linetype = "dashed", 
-                color = "black", formula = y~-1 + x,show.legend =TRUE) + 
+                color = "black", formula = y~x,show.legend =TRUE) + 
     # straight line fit through estimates
     geom_smooth(aes(x = get(pred_var), y = as.numeric(out) ),
                 color = "red", se = FALSE, method = "loess") +
@@ -53,7 +53,6 @@ cal_plot <- function(model, data, model_name, pred_var, model_label, dir, fn, ..
           panel.grid.minor = element_blank()) +    
     ggtitle(model_label) + 
     theme_bw()
-  
   
   # The distribution plot   
   xlabel='Calibrated Probability'
@@ -78,6 +77,25 @@ cal_plot <- function(model, data, model_name, pred_var, model_label, dir, fn, ..
   pdf(paste0(dir, "/", fn), useDingbats=FALSE) 
   plot(g)
   dev.off()
+}
+
+cal_coeff <- function(data, pred_var) {
+  data <- mutate(data, bin = ntile(get(pred_var), 10)) %>% 
+    # Bin prediction into 10ths
+    group_by(bin) %>%
+    mutate(n = n(), # Get ests and CIs
+           bin_pred = mean(get(pred_var)), 
+           bin_prob = mean(as.numeric(out) ), 
+           se = sqrt((bin_prob * (1 - bin_prob)) / n), 
+           ul = bin_prob + 1.96 * se, 
+           ll = bin_prob - 1.96 * se,
+           ul = ifelse(ul>0,ul,0),
+           ll = ifelse(ll >0, ll,0),
+           ul = ifelse(ul<1,ul,1),
+           ll = ifelse(ll <1, ll,1))%>%
+    ungroup()
+  res <- lm(formula = bin_prob~bin_pred, data)
+  return(res)
 }
 
 # Receiver Operator Curve plots with pROC package:

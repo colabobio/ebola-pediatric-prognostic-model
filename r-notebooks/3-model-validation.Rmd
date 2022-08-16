@@ -68,6 +68,8 @@ m1
 data$m1_pred <- predict(m1, type = "response")
 
 cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_validation.pdf")
+res <- cal_coeff(data, "m1_pred")
+res
 ```
 
 The plot above shows that the model is not well calibrated. The test below quantifies that:
