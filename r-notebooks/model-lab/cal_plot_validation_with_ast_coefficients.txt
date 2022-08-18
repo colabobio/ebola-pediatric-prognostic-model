@@ -1,0 +1,8 @@
+
+Call:
+lm(formula = bin_prob ~ bin_pred, data = data)
+
+Coefficients:
+(Intercept)     bin_pred  
+  -0.008164     1.025513  
+

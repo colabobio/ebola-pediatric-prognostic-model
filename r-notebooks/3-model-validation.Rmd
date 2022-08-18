@@ -9,7 +9,6 @@ output:
 library(rms)
 library(dplyr)
 library(tidyr)
-
 library(caret)
 library(ResourceSelection)
 ```
@@ -53,6 +52,40 @@ test_data %>% drop_na() -> test_data
 test_data
 ```
 
+Several model evaluation measures from RMS 
+
+```{r}
+dir <- mdl_folder
+dat <- test_data
+mdl <- model
+
+# Important note: the function in this cell cannot be run inside a function for some reason...
+
+dd <- datadist(dat)
+options(datadist="dd")
+
+mdl_anova <- anova(mdl)
+mdl_update <- update(mdl, x=TRUE, y=TRUE)
+plot(mdl_anova)
+saveToTXT(mdl_anova, dir, "anova.txt")
+saveToPDF(mdl_anova, dir, "anova.pdf")
+
+mdl_val <- validate(mdl_update, B=100)
+print(mdl_val)
+saveToTXT(mdl_val, dir, "validation.txt")
+
+#mdl_cal <- calibrate(mdl_update, B=100)
+#plot(mdl_cal)
+#saveToPDF(mdl_cal, dir, "calibration.pdf")
+
+f <- mdl_update
+plot(summary(f), log=TRUE)
+
+pdf(paste0(dir, "/or.pdf"), useDingbats=FALSE) 
+plot(summary(f), log=TRUE)  
+dev.off()  
+```
+
 Generate calibration and ROC plots
 
 ```{r}
@@ -67,10 +100,9 @@ m1
 
 data$m1_pred <- predict(m1, type = "response")
 
-cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_validation.pdf")
-res <- cal_coeff(data, "m1_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_coefficients.txt")
+cal_plot(m1, data, "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_validation.pdf")
+c1 <- cal_coeff(data, "m1_pred", mdl_folder, "cal_plot_coefficients.txt")
+print(c1)
 ```
 
 The plot above shows that the model is not well calibrated. The test below quantifies that:
@@ -89,25 +121,71 @@ roc_plot(obs, probs, dir = mdl_folder, fn = "roc_plot_validation.pdf")
 ```
 
 ```{r}
-
-# Calculate perfromace measures using ROCit:
-# https://cran.r-project.org/web/packages/ROCit/index.html
-# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
-
-measure <- measureit(score = probs, class = obs,
-                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
-
-names(measure)
-plot(measure$ACC~measure$Cutoff, type = "l")
-plot(measure$SENS~measure$Cutoff, type = "l")
-plot(measure$SPEC~measure$Cutoff, type = "l")
-plot(measure$FSCR~measure$Cutoff, type = "l")
+plot_roc_perf(obs, probs)
 ```
 
 Finally, the confusion matrix is calculated below:
 
 ```{r}
-conf <- confusionMatrix(data=as.factor(as.integer(probs > 0.63)), reference = as.factor(obs), positive = "1")
-conf
-saveToTXT(conf, mdl_folder, "conf_matrix.txt")
+conf_matrix(obs, probs, 0.63, mdl_folder, "conf_matrix.txt")
 ``` 
+
+=============================================================================================================================
+
+Calculate performance on reference model (age + Ct) from Colubri & Hartley 
+
+
+```{r}
+# Construct the reference prognostic model that only uses age and Ct in the first 48 hours
+
+ref_model <- function(df) {
+  # Calculate the linear term in the logistic function of the model
+  # p(x) = 1 / (1+exp(-lp(x))
+  lp = with(df, 
+            0.86215 - 
+              0.05343*PatientAge + 
+              3*10^-5*max(PatientAge - 5.0, 0)^3 - 
+              6*10^-5*max(PatientAge - 30.0, 0)^3 + 
+              3*10^-5*max(PatientAge - 58.0, 0)^3 - 
+              0.8694*CTnorm)
+  return(lp)
+}
+```
+
+```{r}
+# Add normalized Ct to data, needed by reference model
+test_data$CTnorm <- (test_data$CT - mean(test_data$CT, na.rm=T))/sd(test_data$CT, na.rm=T)
+```
+
+```{r}
+mdl_folder0 <- "model-ref"
+dir.create(mdl_folder0)
+
+vars0 <- c('Death', 'PatientAge', 'CTnorm')
+all_data0 <- test_data %>% select(all_of(vars0))
+                             
+data0 <- all_data0[complete.cases(all_data0),]
+obs0 <- data0$Death
+
+pred0 <- unlist(map(1:nrow(data0), function(x) ref_model(data0[x,]))) # prediction in log-odds (probabilities on logit scale)
+probs0 <- 1 / (1 + exp(-pred0))                                       # prediction as probability response
+
+# Generate the data frame with the data needed for the calibration and ROC plots
+plot_data0 <- data.frame(out = data0$Death, logodds = pred0, prob = probs0)
+
+cal_plot(ref_model, plot_data0, "prob", model_label = '', dir = mdl_folder0, fn = "cal_plot.pdf")
+c0 <- cal_coeff(plot_data0, "prob", mdl_folder0, "cal_plot_coefficients.txt")
+print(c0)
+```
+
+```{r}
+roc_plot(data0$Death, probs0, dir = mdl_folder0, fn = "roc_plot.pdf")
+```
+
+```{r}
+plot_roc_perf(obs0, probs0)
+```
+
+```{r}
+conf_matrix(obs0, probs0, 0.61, mdl_folder, "conf_matrix.txt")
+```

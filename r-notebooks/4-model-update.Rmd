@@ -10,7 +10,6 @@ library(Hmisc)
 library(rms)
 library(tidyr)
 library(dplyr)
-library(ROCit)
 ```
 
 This notebook updates the model applying recalibration, and then adding one more predictor
@@ -22,8 +21,9 @@ source('./mdl-evaluation.R')
 Start by loading model:
 
 ```{r}
-mdl_folder = "model-age-ct-symp"
-load(paste0(mdl_folder, "/model.RData"))
+load("model-age-ct-symp/model.RData")
+mdl_folder = "model-lab"
+dir.create(mdl_folder)
 ```
 
 Second, loading data:
@@ -74,10 +74,9 @@ m2
 
 data$m2_pred <- predict(m2, type = "response")
 
-cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_on_the_large.pdf")
-res <- cal_coeff(data, "m2_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_recalibration_on_the_large_coefficients.txt")
+cal_plot(m2, data, "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_on_the_large.pdf")
+c2 <- cal_coeff(data, "m2_pred", mdl_folder, "cal_plot_recalibration_on_the_large_coefficients.txt")
+print(c2)
 ```
 
 1.2 Logistic recalibration
@@ -90,10 +89,9 @@ m3
 
 data$m3_pred <- predict(m3, type = "response")
 
-cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_logistic.pdf")
-res <- cal_coeff(data, "m3_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_recalibration_logistic_coefficients.txt")
+cal_plot(m3, data, "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_recalibration_logistic.pdf")
+c3 <- cal_coeff(data, "m3_pred", mdl_folder, "cal_plot_recalibration_logistic_coefficients.txt")
+print(c3)
 ```
 
 2. ADDING PREDICTOR TO MODEL
@@ -136,6 +134,12 @@ res3 <- flattenCorrMatrix(res2$r, res2$P)
 res3
 ```
 
+```{r}
+res3[res3$column == "Lab.AmLyteCK.D1.D2" & res3$row == "Lab.AmLyteALT.D1.D2",]
+res3[res3$column == "Lab.AmLyteCK.D1.D2" & res3$row == "Lab.AmLyteAST.D1.D2",]
+res3[res3$column == "Lab.AmLyteALT.D1.D2" & res3$row == "Lab.AmLyteAST.D1.D2",]
+```
+
 From inspecting the table below, the only lab results with significant correlation with outcome are:
 Lab.AmLyteALT.D1.D2 (c=0.57, P=5.83-04), 
 Lab.AmLyteAST.D1.D2 (c=0.56, P=2.8e-03), and 
@@ -163,139 +167,224 @@ all_test_data %>%
 
 ```{r}
 test_data_labs %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, ALT) -> test_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, ALT) -> test_data1
 
-test_data %>% drop_na() -> test_data
-test_data
+test_data1 %>% drop_na() -> test_data1
+test_data1
 ```
 
 ```{r}
-pred <- predict(model, test_data)
+pred <- predict(model, test_data1)
 probs <- exp(pred) / (1 + exp(pred))
-obs <- test_data$Death
+obs <- test_data1$Death
 
-data = data.frame(out = obs, prob = probs)
-data$logodds = log(data$prob / (1-data$prob))
+data1 = data.frame(out = obs, prob = probs)
+data1$logodds = log(data1$prob / (1-data1$prob))
 
-m1 <- glm(data$out ~ 1 + data$logodds + test_data$ALT, family = binomial)
+m1 <- glm(data1$out ~ 1 + data1$logodds + test_data1$ALT, family = binomial)
 m1
 
-data$m1_pred <- predict(m1, type = "response")
+data1$pred <- predict(m1, type = "response")
 
-cal_plot(m1, data, "original", "m1_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt.pdf")
-res <- cal_coeff(data, "m1_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_validation_with_alt_coefficients.txt")
+cal_plot(m1, data1, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt.pdf")
+c1 <- cal_coeff(data1, "pred", mdl_folder, "cal_plot_validation_with_alt_coefficients.txt")
+print(c1)
 
-roc_plot(data$out, data$m1_pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt.pdf")
+roc_plot(data1$out, data1$pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt.pdf")
 ```
 
 ```{r}
-
-# Calculate perfromace measures using ROCit:
-# https://cran.r-project.org/web/packages/ROCit/index.html
-# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
-
-measure <- measureit(score = probs, class = obs,
-                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
-
-names(measure)
-plot(measure$ACC~measure$Cutoff, type = "l")
-plot(measure$SENS~measure$Cutoff, type = "l")
-plot(measure$SPEC~measure$Cutoff, type = "l")
-plot(measure$FSCR~measure$Cutoff, type = "l")
+plot_roc_perf(data1$out, data1$pred)
 ```
+
+```{r}
+conf_matrix(data1$out, data1$pred, 0.15, mdl_folder, "conf_matrix_model_with_alt.txt")
+``` 
 
 2. AST
 
 ```{r}
 test_data_labs %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, AST) -> test_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, AST) -> test_data2
 
-test_data %>% drop_na() -> test_data
-test_data
+test_data2 %>% drop_na() -> test_data2
+test_data2
 ```
 
 ```{r}
-pred <- predict(model, test_data)
+pred <- predict(model, test_data2)
 probs <- exp(pred) / (1 + exp(pred))
-obs <- test_data$Death
+obs <- test_data2$Death
 
-data = data.frame(out = obs, prob = probs)
-data$logodds = log(data$prob / (1-data$prob))
+data2 = data.frame(out = obs, prob = probs)
+data2$logodds = log(data2$prob / (1-data2$prob))
 
-m2 <- glm(data$out ~ 1 + data$logodds + test_data$AST, family = binomial)
+m2 <- glm(data2$out ~ 1 + data2$logodds + test_data2$AST, family = binomial)
 m2
 
-data$m2_pred <- predict(m2, type = "response")
+data2$pred <- predict(m2, type = "response")
 
-cal_plot(m2, data, "original", "m2_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ast.pdf")
-res <- cal_coeff(data, "m2_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_validation_with_ast_coefficients.txt")
+cal_plot(m2, data2, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ast.pdf")
+c2 <- cal_coeff(data2, "pred", mdl_folder, "cal_plot_validation_with_ast_coefficients.txt")
+print(c2)
 
-roc_plot(data$out, data$m2_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast.pdf")
+roc_plot(data2$out, data2$pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast.pdf")
 ```
 
 ```{r}
-
-# Calculate perfromace measures using ROCit:
-# https://cran.r-project.org/web/packages/ROCit/index.html
-# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
-
-measure <- measureit(score = probs, class = obs,
-                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
-
-names(measure)
-plot(measure$ACC~measure$Cutoff, type = "l")
-plot(measure$SENS~measure$Cutoff, type = "l")
-plot(measure$SPEC~measure$Cutoff, type = "l")
-plot(measure$FSCR~measure$Cutoff, type = "l")
+plot_roc_perf(data2$out, data2$pred)
 ```
 
-2. CK
+```{r}
+conf_matrix(data2$out, data2$pred, 0.25, mdl_folder, "conf_matrix_model_with_ast.txt")
+``` 
+
+3. CK
 
 ```{r}
 test_data_labs %>%
- select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, CK) -> test_data
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, CK) -> test_data3
 
-test_data %>% drop_na() -> test_data
-test_data
+test_data3 %>% drop_na() -> test_data3
+test_data3
 ```
 
 ```{r}
-pred <- predict(model, test_data)
+pred <- predict(model, test_data3)
 probs <- exp(pred) / (1 + exp(pred))
-obs <- test_data$Death
+obs <- test_data3$Death
 
-data = data.frame(out = obs, prob = probs)
-data$logodds = log(data$prob / (1-data$prob))
+data3 = data.frame(out = obs, prob = probs)
+data3$logodds = log(data3$prob / (1-data3$prob))
 
-m3 <- glm(data$out ~ 1 + data$logodds + test_data$CK, family = binomial)
+m3 <- glm(data3$out ~ 1 + data3$logodds + test_data3$CK, family = binomial)
 m3
 
-data$m3_pred <- predict(m3, type = "response")
+data3$pred <- predict(m3, type = "response")
 
-cal_plot(m3, data, "original", "m3_pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ck.pdf")
-res <- cal_coeff(data, "m3_pred")
-res
-saveToTXT(res, mdl_folder, "cal_plot_validation_with_ck_coefficients.txt")
+cal_plot(m3, data3, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ck.pdf")
+c3 <- cal_coeff(data3, "pred", mdl_folder, "cal_plot_validation_with_ck_coefficients.txt")
+print(c3)
 
-roc_plot(data$out, data$m3_pred, dir = mdl_folder, fn = "roc_plot_validation_with_ck.pdf")
+roc_plot(data3$out, data3$pred, dir = mdl_folder, fn = "roc_plot_validation_with_ck.pdf")
 ```
 
 ```{r}
+plot_roc_perf(data3$out, data3$pred)
+```
+```{r}
+conf_matrix(data3$out, data3$pred, 0.24, mdl_folder, "conf_matrix_model_with_ck.txt")
+```
 
-# Calculate perfromace measures using ROCit:
-# https://cran.r-project.org/web/packages/ROCit/index.html
-# https://cran.r-project.org/web/packages/ROCit/vignettes/my-vignette.html
+4. AST + CK 
 
-measure <- measureit(score = probs, class = obs,
-                     measure = c("ACC", "SENS", "SPEC", "FSCR"))
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, AST, CK) -> test_data4
 
-names(measure)
-plot(measure$ACC~measure$Cutoff, type = "l")
-plot(measure$SENS~measure$Cutoff, type = "l")
-plot(measure$SPEC~measure$Cutoff, type = "l")
-plot(measure$FSCR~measure$Cutoff, type = "l")
+test_data4 %>% drop_na() -> test_data4
+test_data4
+```
+
+```{r}
+pred <- predict(model, test_data4)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data4$Death
+
+data4 = data.frame(out = obs, prob = probs)
+data4$logodds = log(data4$prob / (1-data4$prob))
+
+m4 <- glm(data4$out ~ 1 + data4$logodds + test_data4$AST + test_data4$CK, family = binomial)
+m4
+
+data4$pred <- predict(m4, type = "response")
+
+cal_plot(m3, data4, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_ast_ck.pdf")
+c4 <- cal_coeff(data4, "pred", mdl_folder, "cal_plot_validation_with_ast_ck_coefficients.txt")
+print(c4)
+
+roc_plot(data4$out, data4$pred, dir = mdl_folder, fn = "roc_plot_validation_with_ast_ck.pdf")
+```
+
+```{r}
+plot_roc_perf(data4$out, data4$pred)
+```
+```{r}
+conf_matrix(data4$out, data4$pred, 0.5, mdl_folder, "conf_matrix_model_with_ast_ck.txt")
+```
+
+5. ALT + CK
+
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, ALT, CK) -> test_data5
+
+test_data5 %>% drop_na() -> test_data5
+test_data5
+```
+
+```{r}
+pred <- predict(model, test_data5)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data5$Death
+
+data5 = data.frame(out = obs, prob = probs)
+data5$logodds = log(data5$prob / (1-data5$prob))
+
+m4 <- glm(data5$out ~ 1 + data5$logodds + test_data5$ALT + test_data5$CK, family = binomial)
+m4
+
+data5$pred <- predict(m4, type = "response")
+
+cal_plot(m3, data5, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt_ck.pdf")
+c4 <- cal_coeff(data5, "pred", mdl_folder, "cal_plot_validation_with_alt_ck_coefficients.txt")
+print(c4)
+
+roc_plot(data5$out, data5$pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt_ck.pdf")
+```
+
+```{r}
+plot_roc_perf(data5$out, data5$pred)
+```
+
+```{r}
+conf_matrix(data5$out, data5$pred, 0.5, mdl_folder, "conf_matrix_model_with_alt_ck.txt")
+```
+
+6. ALT + AST + CK 
+
+```{r}
+test_data_labs %>%
+ select(Death, PatientAge, CT, AnyBleeding, Diarrhoea, Breathlessness, SwallowingProblems, ALT, AST, CK) -> test_data6
+
+test_data6 %>% drop_na() -> test_data6
+test_data6
+```
+
+```{r}
+pred <- predict(model, test_data6)
+probs <- exp(pred) / (1 + exp(pred))
+obs <- test_data6$Death
+
+data6 = data.frame(out = obs, prob = probs)
+data6$logodds = log(data6$prob / (1-data6$prob))
+
+m4 <- glm(data6$out ~ 1 + data6$logodds + test_data6$ALT + test_data6$AST + test_data6$CK, family = binomial)
+m4
+
+data6$pred <- predict(m4, type = "response")
+
+cal_plot(m3, data6, "pred", model_label ='', dir = mdl_folder, fn = "cal_plot_model_with_alt_ast_ck.pdf")
+c4 <- cal_coeff(data6, "pred", mdl_folder, "cal_plot_validation_with_alt_ast_ck_coefficients.txt")
+print(c4)
+
+roc_plot(data6$out, data6$pred, dir = mdl_folder, fn = "roc_plot_validation_with_alt_ast_ck.pdf")
+```
+
+```{r}
+plot_roc_perf(data6$out, data6$pred)
+```
+
+```{r}
+conf_matrix(data6$out, data6$pred, 0.5, mdl_folder, "conf_matrix_model_with_alt_ast_ck.txt")
 ```
